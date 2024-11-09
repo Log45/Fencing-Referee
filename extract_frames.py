@@ -2,7 +2,7 @@ import cv2
 import os
 from pathlib import Path
 
-def extract_frames(file_path: str, save_dir: str):
+def extract_frames(file_path: str, save_dir: str, frames_extracted_per_second: int = 7):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     file_stem = Path(file_path).stem
@@ -14,9 +14,9 @@ def extract_frames(file_path: str, save_dir: str):
         success,image = vidcap.read()
         if not success:
             break
-        if not (count % fps) or (count % fps == fps // 5) or (count % fps == fps // 4) or (count % fps == fps // 3) or (count % fps == fps // 2) or (count % fps == fps // 1.5) or (count % fps == fps // 1.1):
+        if count % (fps // frames_extracted_per_second) == 0:
             print(f'Reading frame {count} {success}')
-            cv2.imwrite(f"{save_dir}/{file_stem}_{count}.jpg", image)     # save frame as JPEG file      
+            cv2.imwrite(f"{save_dir}/{file_stem}_{count}.jpg", image)     # save frame as JPEG file 
         count += 1
 
 dir = Path("./Fencing-Dataset/Edited_Clips")

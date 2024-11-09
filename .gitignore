@@ -5,3 +5,11 @@
 *.mov
 
 /Fencing-Dataset
+/labels
+/.venv
+/__pycache__
+/.vscode
+/yolo
+/dataset
+/yolov7
+*/.DS_Store
