@@ -75,6 +75,7 @@ class ScoreboxThresholdClassifier:
         if show_images:
             green_contours_img = self.draw_contours(src, green_contours, (0, 255, 0))
             contours_img = self.draw_contours(green_contours_img, red_contours, (0, 0, 255))
+            contours_img = cv2.resize(contours_img, (960, 540))     # Resize image to fit on screen
             cv2.imshow("contours_img", contours_img)
             cv2.waitKey(0)
 
