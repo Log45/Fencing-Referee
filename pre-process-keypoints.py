@@ -56,9 +56,16 @@ def preprocess_data(input_file, output_file):
                 data[0] = "1"
             '''
 
-            # Convert bounding box format
-            class_id, x_min, y_min, x_max, y_max = convert_xywh_to_xyxy(data)
+            # Skip non-scorebox items
+            if data[0] in ["0", "1"]:
+                continue
+            data[0] = "0"
 
+            # Convert bounding box format
+            # class_id, x_min, y_min, x_max, y_max = convert_xywh_to_xyxy(data)
+            class_id, x_center, y_center, width, height = data[:5]
+
+            '''
             # Process the keypoints, removing the extra values (e.g., visibility/confidence)
             keypoints = []
             for i in range(5, len(data), 3):  # Each keypoint has 3 values (x, y, extra)
@@ -66,9 +73,11 @@ def preprocess_data(input_file, output_file):
                 keypoint_y = data[i + 1]
                 # We skip the extra value (e.g., visibility flag or confidence score)
                 keypoints.append(f"{keypoint_x} {keypoint_y}")
+            '''
 
             # Reconstruct the line without the extra keypoint data
-            processed_line = f"{class_id} {x_min} {y_min} {x_max} {y_max} " + " ".join(keypoints)
+            # processed_line = f"{class_id} {x_min} {y_min} {x_max} {y_max} " + " ".join(keypoints)
+            processed_line = f"{class_id} {x_center} {y_center} {width} {height}"
 
             outfile.write(processed_line + "\n")
             '''
