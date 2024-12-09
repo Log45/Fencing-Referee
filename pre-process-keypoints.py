@@ -18,112 +18,124 @@ def convert_xywh_to_xyxy(data):
     Returns:
         tuple: Converted class_id, x_min, y_min, x_max, y_max, followed by the remaining keypoints.
     """
-    # Extract the first 5 values: class_id, x_center, y_center, width, height
     class_id, x_center, y_center, width, height = data[:5]
     x_center, y_center, width, height = map(float, [x_center, y_center, width, height])
-
-    # Convert to x_min, y_min, x_max, y_max
     x_min = x_center - (width / 2)
     y_min = y_center - (height / 2)
     x_max = x_center + (width / 2)
     y_max = y_center + (height / 2)
-
     return class_id, x_min, y_min, x_max, y_max
 
 
-def preprocess_data(input_file, output_file):
+def preprocess_data(input_file, output_file, mode):
     """
-    Preprocess the dataset by removing the extra data points (visibility flags or confidence scores)
-    and converting bounding box format to x_min, y_min, x_max, y_max.
+    Preprocess the dataset by removing extra data and converting bounding box format.
 
     Args:
         input_file (str): Path to the input dataset file.
         output_file (str): Path where the preprocessed dataset will be saved.
+        mode (str): Mode for processing ('fencers' or 'scoreboxes').
     """
     with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
-        lines = infile.readlines()  # Read all lines to process
-        for i, line in enumerate(lines):
-            # Split the line into individual values
+        lines = infile.readlines()
+        for line in lines:
             data = line.strip().split()
-
-            '''
-            # Skip lines with label 1
-            if data[0] == "1":
-                continue
-
-            # Rename lines with label 2 to 1
-            if data[0] == "2":
-                data[0] = "1"
-            '''
-
-            # Skip scoreboxes
-            if data[0] == "2":
-                continue
-
-            # Convert bounding box format
-            class_id, x_min, y_min, x_max, y_max = data[:5]  # convert_xywh_to_xyxy(data)
-
-            # Process the keypoints, removing the extra values (e.g., visibility/confidence)
-            keypoints = []
-            for i in range(5, len(data), 3):  # Each keypoint has 3 values (x, y, extra)
-                keypoint_x = data[i]
-                keypoint_y = data[i + 1]
-                # We skip the extra value (e.g., visibility flag or confidence score
-                keypoints.append(f"{keypoint_x} {keypoint_y}")
-
-            # Reconstruct the line without the extra keypoint data
-            processed_line = f"{class_id} {x_min} {y_min} {x_max} {y_max} " + " ".join(keypoints)
-
-            outfile.write(processed_line + "\n")
-            '''
-            # Write the processed line to the file without a trailing newline on the last line
-            if i < len(lines) - 1:
-                outfile.write(processed_line + "\n")
+            if mode == 'fencers':
+                if data[0] == "2":  # Skip scoreboxes
+                    continue
+                class_id, x_min, y_min, x_max, y_max = data[:5]  # convert_xywh_to_xyxy(data)
+                keypoints = []
+                for i in range(5, len(data), 3):
+                    keypoint_x = data[i]
+                    keypoint_y = data[i + 1]
+                    keypoints.append(f"{keypoint_x} {keypoint_y}")
+                processed_line = f"{class_id} {x_min} {y_min} {x_max} {y_max} " + " ".join(keypoints)
+            elif mode == 'scoreboxes':
+                if data[0] == "0":  # Skip fencers
+                    continue
+                if data[0] == "1":  # Skip sabers
+                    continue
+                if data[0] == "2":
+                    data[0] = "0"  # Rename scoreboxes
+                processed_line = f"{data[0]} {data[1]} {data[2]} {data[3]} {data[4]} "
             else:
-                outfile.write(processed_line)
-            '''
+                continue
+            outfile.write(processed_line + "\n")
     print(f"Data preprocessing complete. Processed file saved as '{output_file}'.")
 
 
-def process_and_manage_labels(base_dir):
+def copy_images(input_dir, output_dir):
     """
-    Handle the directories for label processing:
-    - If 'old_labels' exists, process the files inside and store the output in 'labels'.
-    - If 'old_labels' does not exist, process the files in 'labels', move them to 'old_labels', and save the output in 'labels'.
+    Copy all image files from input_dir to output_dir.
 
     Args:
-        base_dir (str): Path to the base directory containing the 'labels' folder.
+        input_dir (str): Source directory for images.
+        output_dir (str): Destination directory for images.
     """
-    labels_dir = os.path.join(base_dir, 'labels')
-    old_labels_dir = os.path.join(base_dir, 'old_labels')
+    os.makedirs(output_dir, exist_ok=True)
+    for img_file in glob.glob(os.path.join(input_dir, "*.*")):
+        shutil.copy2(img_file, os.path.join(output_dir, os.path.basename(img_file)))
 
-    # Determine input and output directories
-    if os.path.exists(old_labels_dir):
-        print(f"'old_labels' directory exists. Processing files from '{old_labels_dir}'.")
-        input_dir = old_labels_dir
-    else:
-        print(f"'old_labels' directory does not exist. Processing files from '{labels_dir}' and creating 'old_labels'.")
-        os.makedirs(old_labels_dir, exist_ok=True)
-        for file in glob.glob(os.path.join(labels_dir, "*.txt")):
-            shutil.move(file, old_labels_dir)  # Move existing labels to 'old_labels'
-        input_dir = old_labels_dir
 
-    # Process files and save output in 'labels'
-    os.makedirs(labels_dir, exist_ok=True)  # Ensure 'labels' directory exists
-    for input_file in glob.glob(os.path.join(input_dir, "*.txt")):
+def delete_directory(directory):
+    """
+    Delete a directory if it exists.
+
+    Args:
+        directory (str): Path to the directory to delete.
+    """
+    if os.path.exists(directory):
+        shutil.rmtree(directory)
+        print(f"Deleted directory: {directory}")
+
+
+def process_and_manage_labels_and_images(mode, base_dir):
+    """
+    Handle the directories for label processing, image moving, and cleanup.
+
+    Args:
+        mode (str): Mode for processing ('fencers' or 'scoreboxes').
+        base_dir (str): Base directory ('train', 'valid', 'test').
+    """
+    labels_dir = os.path.join('./datasets', mode, base_dir, 'labels')
+    images_dir = os.path.join('./datasets', mode, base_dir, 'images')
+    unprocessed_labels_dir = os.path.join('./datasets/unprocessed', base_dir, 'labels')
+    unprocessed_images_dir = os.path.join('./datasets/unprocessed', base_dir, 'images')
+    base_labels_dir = os.path.join('./datasets', base_dir, 'labels')
+    base_images_dir = os.path.join('./datasets', base_dir, 'images')
+
+    # Process labels
+    if not os.path.exists(unprocessed_labels_dir):
+        os.makedirs(unprocessed_labels_dir, exist_ok=True)
+        for file in glob.glob(os.path.join(base_labels_dir, "*.txt")):
+            shutil.move(file, unprocessed_labels_dir)
+    os.makedirs(labels_dir, exist_ok=True)
+    for input_file in glob.glob(os.path.join(unprocessed_labels_dir, "*.txt")):
         output_file = os.path.join(labels_dir, os.path.basename(input_file))
-        preprocess_data(input_file, output_file)
+        preprocess_data(input_file, output_file, mode)
 
-    print(f"Processed labels saved in '{labels_dir}'.")
+    # Process images based on mode
+    if not os.path.exists(unprocessed_images_dir):
+        os.makedirs(unprocessed_images_dir, exist_ok=True)
+        copy_images(base_images_dir, unprocessed_images_dir)
+    if mode == "fencers":
+        copy_images(unprocessed_images_dir, images_dir)
+    elif mode == "scoreboxes":
+        copy_images(unprocessed_images_dir, os.path.join('./datasets/scoreboxes', base_dir, 'images'))
+    else:  # unprocessed
+        copy_images(unprocessed_images_dir, os.path.join('./datasets/unprocessed', base_dir, 'images'))
+
+    # Delete original base_dir
+    base_dir_path = os.path.join('./datasets', base_dir)
+    delete_directory(base_dir_path)
+
+    print(f"Processed labels and images saved in '{os.path.join('./datasets', mode, base_dir)}'.")
 
 
 # Directories to process
-directories = [
-    './datasets/test',
-    './datasets/train',
-    './datasets/valid'
-]
+directories = ['train', 'valid', 'test']
 
-# Process all directories
-for directory in directories:
-    process_and_manage_labels(directory)
+# Process all directories for both modes
+for mode in ["fencers", "scoreboxes"]:
+    for directory in directories:
+        process_and_manage_labels_and_images(mode, directory)

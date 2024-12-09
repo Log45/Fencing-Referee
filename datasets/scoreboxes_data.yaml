@@ -1,0 +1,14 @@
+# IMPORTANT: Local dirs don't work here, you have to change this to match your directory structure!!!!
+train: "C:\\Users\\alynf\\OneDrive\\Documents\\Fencing-Referee\\datasets\\scoreboxes\\train\\images"
+val: "C:\\Users\\alynf\\OneDrive\\Documents\\Fencing-Referee\\datasets\\scoreboxes\\valid\\images"
+test: "C:\\Users\\alynf\\OneDrive\\Documents\\Fencing-Referee\\datasets\\scoreboxes\\test\\images"
+
+names:
+  0: scorebox
+
+roboflow:
+  workspace: ai-fencing-5vbck
+  project: fencer-pose
+  version: 4
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/ai-fencing-5vbck/fencer-pose/dataset/4

@@ -3,3 +3,4 @@ tqdm
 opencv-python
 inference
 supervision
+onnx
