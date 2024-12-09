@@ -34,13 +34,13 @@ def train_new_model():
     Train a new YOLO model.
     """
     # Load the base model (could be any of the versions: yolov8n.pt, yolov8s.pt, etc.)
-    model = YOLO("yolov8n.pt")  # (Medium detect model) 
+    model = YOLO("yolo11n-pose.pt")  # (Medium detect model) 
     # model = YOLO("yolov8n-pose.pt")  # (Medium pose model)
     
     trained_model = model.train(
         data="./datasets/data.yaml",        # Path to your data.yaml file
-        epochs=50,                          # Number of epochs to train
-        batch=16,                           # Batch size
+        epochs=100,                          # Number of epochs to train
+        batch=-1,                           # Batch size
         imgsz=640,                          # Image size (default is 640x640)
         name="fencer_pose_yolov8_model",    # Experiment name
         save=True                           # Save the best and last models

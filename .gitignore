@@ -13,4 +13,5 @@
 /yolo
 /dataset
 /yolov7
+/runs
 */.DS_Store
