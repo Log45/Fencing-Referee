@@ -6,14 +6,15 @@ import cv2
 import cv2_common
 from argparse import ArgumentParser, Namespace
 from yolo_scorebox_classifier import ScoreboxDetectorClassifier
+from fencer_pose import FencerPoseClassifier
 
 
 ## Constants
 
 SCOREBOX_MODEL_PATH = 'trained_models/scorebox_detect/scorebox_detect.pt'
+FENCER_POSE_MODEL_PATH = 'trained_models/fencer_saber_keypoint/fencer_saber_keypoint.pt'
 
-
-## Code
+## Functions for Stream Handling
 
 def get_stream(args: Namespace) -> cv2.VideoCapture:
     stream_method: str | None = args.mode
@@ -48,6 +49,7 @@ def get_stream_file(filename: str) -> cv2.VideoCapture:
         raise IOError(f'Could not open video file {filename}')
     return cap
 
+## Main Processing Loop
 
 def main():
     # Parse command-line args
@@ -56,8 +58,10 @@ def main():
     parser.add_argument('-f', '--filename', required=False)
     args = parser.parse_args()
 
-    # Load model
+    # Load scorebox model
     scorebox_detector = ScoreboxDetectorClassifier(SCOREBOX_MODEL_PATH)
+    # Load fencer pose model
+    fencer_pose_classifier = FencerPoseClassifier(FENCER_POSE_MODEL_PATH)
 
     # Open video stream
     cap: cv2.VideoCapture = get_stream(args)
@@ -69,17 +73,26 @@ def main():
             print('Stream ended; closing...')
             break
 
-        # Process
-        scorebox_classification, labeled_frame = scorebox_detector.detect_and_classify(frame, debug=False)
-        print(scorebox_classification)
+        # Process frame with scorebox detection
+        scorebox_classification, labeled_frame_scoreboxes = scorebox_detector.detect_and_classify(frame, debug=False)
+
+        # Process frame with fencer pose classification
+        labeled_frame_fencers = fencer_pose_classifier.evaluate_on_input(labeled_frame_scoreboxes)  # Process the same frame
+
+        # Combine outputs for debugging/logging
+        print(f"Scorebox Classification: {scorebox_classification}")
+        #print(f"Fencer Poses: {fencer_poses}")
 
         # Display the frame and wait for 1/30th of a second
-        cv2.imshow('stream', labeled_frame)
+        cv2.imshow('stream', labeled_frame_fencers)
         # cv2.waitKey(int(1000 / 30))
         if scorebox_classification != cv2_common.NO_SIDE:
-            cv2.waitKey(0)
+            cv2.waitKey(0) # Pause when a valid classification is found
         else:
-            cv2.waitKey(1)
+            cv2.waitKey(1) # Continue running
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

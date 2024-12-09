@@ -103,7 +103,26 @@ class ScoreboxDetectorClassifier:
                 classification = classifier.classify(cropped_img, show_images=debug)
                 print(f"Classification result: {classification}")
         
-        return classification, img_labeled
+        return classification, img_labeled 
+    
+    def train_new_model():
+        """
+        Train a new YOLO model.
+        """
+        # Load the base model (could be any of the versions: yolov8n.pt, yolov8s.pt, etc.)
+        model = YOLO("yolo11n.pt")
+
+        trained_model = model.train(
+            data="./datasets/scoreboxes_data.yaml",        # Path to your data.yaml file
+            epochs=100,                                    # Number of epochs to train
+            batch=-1,                                      # Batch size
+            imgsz=640,                                     # Image size (default is 640x640)
+            name="scorebox_detection_yolov11_model",       # Experiment name
+            save=True                                      # Save the best and last models
+        )
+
+        # Export the model (optional, to use in different formats)
+        model.export(format="onnx")  # Available formats: "onnx", "torchscript", "coreml", etc.
 
 if __name__ == "__main__":
     # User inputs

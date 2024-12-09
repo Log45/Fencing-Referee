@@ -1,99 +1,185 @@
-# conda env config vars set ROBOFLOW_API_KEY=yov2XDGTg2LCmTG6v8ey
-# conda activate c:\Users\alynf\OneDrive\Documents\Fencing-Referee\.conda
-
 from ultralytics import YOLO
-import matplotlib.pyplot as plt
 import cv2
+from cv2.typing import MatLike
+import numpy as np
 
-def load_and_evaluate_model(model_path, image_path):
-    """
-    Load a pre-trained model, evaluate it on an image, and display the results.
+class FencerPoseClassifier:
+    def __init__(self, model_path=None):
+        """
+        Initialize the classifier by loading a pre-trained model.
 
-    Args:
-        model_path (str): Path to the pre-trained model.
-        image_path (str): Path to the image to be evaluated.
-    """
-    # Load the pre-trained model
-    model = YOLO(model_path)
+        Args:
+            model_path (str): Path to the pre-trained model. If None, the model must be trained before use.
+        """
+        self.model = None
+        if model_path:
+            self.load_model(model_path)
 
-    # Load the image
-    img = cv2.imread(image_path)
-    
-    # Resize the image to 640x640 (YOLOv8 input size)
-    img_resized = cv2.resize(img, (640, 640))  # Resize image to 640x640
-    
-    # Perform inference (predict) on the image
-    results = model(img_resized)
-    for result in results:
-        print(result.boxes)  # Print detection boxes
-        result.show()  # Display the annotated image
-        result.save(filename="result.jpg")  # Save annotated image
+    def load_model(self, model_path):
+        """
+        Load a pre-trained YOLO model.
 
-def train_new_model(mode):
-    """
-    Train a new YOLO model.
-    mode (str): Mode for processing ('fencers' or 'scoreboxes').
-    """
-    # Load the base model (could be any of the versions: yolov8n.pt, yolov8s.pt, etc.)
-    if mode == 'fencers':
-        model = YOLO("yolo11n-pose.pt")  # (Medium detect model) 
+        Args:
+            model_path (str): Path to the pre-trained model.
+        """
+        self.model = YOLO(model_path)
+        print(f"Model loaded from {model_path}")
 
-        trained_model = model.train(
-            data="./datasets/fencers_data.yaml",        # Path to your data.yaml file
-            epochs=10,                                  # Number of epochs to train
-            batch=-1,                                   # Batch size
-            imgsz=640,                                  # Image size (default is 640x640)
-            name="fencer_pose_yolov11_model",           # Experiment name
-            save=True                                   # Save the best and last models
-        )
+    def evaluate_on_input(self, input_path, save_output=False) -> MatLike:
+        """
+        Evaluate the model on a single image or a video.
+
+        Args:
+            input_path (str or np.ndarray): Path to the image, video, or numpy array for evaluation.
+            save_output (bool): Whether to save the output image or video with annotations.
+
+        Returns:
+            MatLike: The labeled frame(s) or None if processing a video.
+        """
+        if not self.model:
+            raise ValueError("No model loaded. Please load a model first.")
+
+        labeled_frame = None  # Initialize variable for labeled frame(s)
         
-    elif mode == 'scoreboxes':
-        model = YOLO("yolo11n.pt")
+        # Check if the input is a numpy array
+        if isinstance(input_path, np.ndarray):
+            img = input_path
+            if img is None or img.ndim not in [2, 3]:
+                raise ValueError("Invalid numpy array. Expected a valid image array.")
 
-        trained_model = model.train(
-            data="./datasets/scoreboxes_data.yaml",        # Path to your data.yaml file
-            epochs=10,                                     # Number of epochs to train
-            batch=-1,                                      # Batch size
-            imgsz=640,                                     # Image size (default is 640x640)
-            name="scorebox_detection_yolov11_model",       # Experiment name
-            save=True                                      # Save the best and last models
+            # Resize the image to 640x640 (YOLOv8 input size)
+            img_resized = cv2.resize(img, (640, 640))
+
+            # Perform inference
+            results = self.model(img_resized)
+            for result in results:
+                print(result.boxes)  # Print detection boxes
+                labeled_frame = result.plot()  # Annotated image
+                if save_output:
+                    result.save(filename="result.jpg")  # Save the annotated image
+
+        # Check if the input is an image or a video
+        elif input_path.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
+            # Process as an image
+            img = cv2.imread(input_path)
+            if img is None:
+                raise ValueError(f"Failed to load image from path: {input_path}")
+
+            # Resize the image to 640x640 (YOLOv8 input size)
+            img_resized = cv2.resize(img, (640, 640))
+
+            # Perform inference
+            results = self.model(img_resized)
+            for result in results:
+                print(result.boxes)  # Print detection boxes
+                labeled_frame = result.plot()  # Annotated image
+                if save_output:
+                    result.save(filename="result.jpg")  # Save the annotated image
+
+        elif input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+            # Process as a video
+            cap = cv2.VideoCapture(input_path)
+            if not cap.isOpened():
+                raise ValueError(f"Failed to open video from path: {input_path}")
+
+            # Prepare video writer if saving output
+            if save_output:
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for saving video
+                out = cv2.VideoWriter('output_video.mp4', fourcc, 30.0, (640, 640))
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    print("End of video reached or error reading frame.")
+                    break
+
+                # Resize the frame to 640x640
+                frame_resized = cv2.resize(frame, (640, 640))
+
+                # Perform inference
+                results = self.model(frame_resized)
+                for result in results:
+                    print(result.boxes)  # Print detection boxes
+                    labeled_frame = result.plot()  # Annotated frame
+
+                    # Display the frame
+                    cv2.imshow("Video", labeled_frame)
+                    if save_output:
+                        out.write(labeled_frame)  # Write frame to output video
+
+                # Press 'q' to quit early
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+            cap.release()
+            if save_output:
+                out.release()
+            cv2.destroyAllWindows()
+            labeled_frame = None  # Labeled frames for video are displayed, not returned
+        else:
+            raise ValueError("Unsupported file type. Provide an image (.jpg, .png) or video (.mp4, .avi).")
+
+        return labeled_frame
+
+
+    def train_model(self, dataset_yaml, epochs=100, batch_size=-1, model_name="fencer_pose_model", img_size=640):
+        """
+        Train a new YOLO model.
+
+        Args:
+            dataset_yaml (str): Path to the dataset YAML file.
+            epochs (int): Number of epochs to train.
+            batch_size (int): Batch size for training. -1 uses default.
+            model_name (str): Name for the trained model.
+            img_size (int): Image size for training (default is 640x640).
+        """
+        # Load the base model
+        self.model = YOLO("yolo11n-pose.pt")
+
+        # Train the model
+        self.model.train(
+            data=dataset_yaml,
+            epochs=epochs,
+            batch=batch_size,
+            imgsz=img_size,
+            name=model_name,
+            save=True
         )
 
-    # Export the model (optional, to use in different formats)
-    model.export(format="onnx")  # Available formats: "onnx", "torchscript", "coreml", etc.
+        print(f"Training completed. Model saved as '{model_name}'")
+
+    def export_model(self, format="onnx"):
+        """
+        Export the model to a different format.
+
+        Args:
+            format (str): Format to export the model to (e.g., 'onnx', 'torchscript').
+        """
+        if not self.model:
+            raise ValueError("No model loaded. Please load a model first.")
+
+        self.model.export(format=format)
+        print(f"Model exported in {format} format")
 
 def main():
-    """
-    Main function to allow the user to choose between loading a pre-trained model and evaluating it on an image.
-    """
+    fencer_classifier = FencerPoseClassifier()
+
     print("Choose an option:")
-    print("1. Load a pre-trained model and show its metrics.")
-    print("2. Evaluate a pre-trained model on an image.")
-    print("3. Train a new model.")
+    print("1. Load a pre-trained model and evaluate it on an image.")
+    print("2. Train a new model.")
     
-    choice = input("Enter your choice (1, 2, or 3): ")
-    
+    choice = input("Enter your choice (1 or 2): ")
+
     if choice == "1":
         model_path = input("Enter the path to the pre-trained model (e.g., 'best.pt'): ")
-        load_and_evaluate_model(model_path, image_path=None)  # Only evaluate model metrics, no image
-    elif choice == "2":
-        model_path = input("Enter the path to the pre-trained model (e.g., 'best.pt'): ")
+        fencer_classifier.load_model(model_path)
         image_path = input("Enter the path to the image for evaluation (e.g., 'image.jpg'): ")
-        load_and_evaluate_model(model_path, image_path)  # Evaluate the model on the specified image
-    elif choice == "3":
-        print("Are you trainining a model for:")
-        print("1. Scorebox detection.")
-        print("2. Fencer and saber detection and keypoints.")
-        choice = input("Enter your choice (1 or 2): ")
-        # Train a new model
-        if choice == "1":
-            train_new_model("scoreboxes")
-        elif choice == "2":
-            train_new_model("fencers")
-        else:
-            print("Invalid choice. Please select either 1 or 2.")
+        fencer_classifier.evaluate_on_input(image_path, save_output=True)
+    elif choice == "2":
+        dataset_yaml = input("Enter the path to the dataset YAML file: ")
+        fencer_classifier.train_model(dataset_yaml)
     else:
-        print("Invalid choice. Please select either 1, 2, or 3.")
+        print("Invalid choice. Please select either 1 or 2.")
 
 if __name__ == "__main__":
     main()
