@@ -1,17 +1,13 @@
 *.mp4
-*.jpg
 *.jpeg
 *.png
 *.mov
 
 /Fencing-Dataset
-/labels
 /.venv
 /venv
 /__pycache__
 /.vscode
 /yolo
-/dataset
-/yolov7
 /runs
 */.DS_Store
