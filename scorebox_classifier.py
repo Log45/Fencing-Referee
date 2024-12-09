@@ -8,6 +8,16 @@ from typing import Sequence
 
 
 class ScoreboxThresholdClassifier:
+    def crop_vertical_proportion(self, src: MatLike, proportion: float) -> MatLike:
+        # Sanity check
+        if proportion <= 0.0 or proportion > 1.0:
+            raise ValueError('"proportion" must be in the range (0, 1].')
+        
+        # Crop image
+        height, width = src.shape[:2]
+        y_max = int(height * proportion)
+        return src[0:y_max, 0:width]
+
     def threshold_red(self, src: MatLike) -> MatLike:
         # Take main red threshold, including wrapping around the zero side of the hue range
         hue_range = 15
@@ -58,7 +68,9 @@ class ScoreboxThresholdClassifier:
     def classify(self, src: MatLike, show_images: bool = False) -> str:
         height, width = src.shape[:2]
 
-        hsv_img = convert_to_hsv(src)
+        cropped_img = self.crop_vertical_proportion(src, 0.5)
+
+        hsv_img = convert_to_hsv(cropped_img)
             
         green_threshold_img = self.threshold_green(hsv_img)
         green_threshold_img = erode_dilate(green_threshold_img, 5)

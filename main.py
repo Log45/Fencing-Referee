@@ -70,7 +70,7 @@ def main():
             break
 
         # Process
-        scorebox_classification, labeled_frame = scorebox_detector.detect_and_classify(frame, debug=True)
+        scorebox_classification, labeled_frame = scorebox_detector.detect_and_classify(frame, debug=False)
         print(scorebox_classification)
 
         # Display the frame and wait for 1/30th of a second
