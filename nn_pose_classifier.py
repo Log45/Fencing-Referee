@@ -10,11 +10,14 @@ from classifier_data import generate_training_data
 
 # Define the neural network
 class SimpleNNClassifier(nn.Module):
-    def __init__(self, path = None, input_size=26, num_classes=4, device="cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"):
+    def __init__(self, path = None, input_size=26, classes = None, device="cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"):
         super(SimpleNNClassifier, self).__init__()
+        self.classes = classes
+        num_classes = len(classes)
         self.device = device
         if path is not None:
             self.load(path)
+            self.model.to(self.device)
         else:
             self.model = nn.Sequential(
                 nn.Linear(input_size, 128),          # Fully connected layer with 128 units
@@ -26,8 +29,8 @@ class SimpleNNClassifier(nn.Module):
                 nn.BatchNorm1d(64),
                 nn.Dropout(0.3),
                 nn.Linear(64, num_classes),          # Output layer with num_classes units
-            )
-        self.model.to(self.device)
+            ).to(self.device)
+        self.model = self.model.to(self.device)
     
     def forward(self, x: torch.Tensor):
         return self.model(x.to(self.device))
@@ -76,9 +79,6 @@ class SimpleNNClassifier(nn.Module):
                 print(f"Epoch {epoch}, Loss: {loss:.5f},  Accuracy: {acc:.2f}% | Test Loss: {test_loss:.5f}, Test Accuracy: {test_acc:.2f}%")
         
         print(classification_report(y_test.cpu().numpy(), self.predict(X_test).cpu().numpy()))
-    
-    def load(self, path):
-        self.model = torch.load(path)
 
 def main():
     # Load the data
@@ -95,7 +95,7 @@ def main():
     # plt.show()
     
     # Initialize the model
-    clf = SimpleNNClassifier(input_size=X.shape[1], num_classes=len(classes), device=device)
+    clf = SimpleNNClassifier(input_size=X.shape[1], classes=classes, device=device)
     
     # Train the model
     clf.fit(X, y, epochs=2000)

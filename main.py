@@ -28,6 +28,8 @@ POINT_DICT = {
     POINT_RIGHT: "Right Fencer"
 }
 
+POSES = ["En Garde", "Lunge", "Parry", "None"]
+
 ## Functions for Stream Handling
 
 def get_stream(args: Namespace) -> cv2.VideoCapture:
@@ -149,9 +151,9 @@ def annotate_frame_with_boxes(frame: MatLike,
 def interim_point_decider(left_pose, right_pose, left_movement, right_movement):
     # Logic Table for determining the point (preferably will be changed to a DecisionTree in the future)
     if left_pose == right_pose:
-        if left_movement > right_movement:
+        if left_movement > abs(right_movement):
             return POINT_LEFT
-        elif right_movement > left_movement:
+        elif abs(right_movement) > left_movement:
             return POINT_RIGHT
     elif left_pose == 2:
         return POINT_LEFT
@@ -175,9 +177,6 @@ def normalize_keypoints_to_bbox(img, keypoints, bbox, imgsize=(640, 640)):
     Returns:
         list of tuples: Keypoints normalized to the bounding box.
     """
-    
-    print(img.shape)
-    
     h, w, _ = img.shape
     
     x1, y1, x2, y2 = bbox
@@ -191,19 +190,12 @@ def normalize_keypoints_to_bbox(img, keypoints, bbox, imgsize=(640, 640)):
     height = y_max - y_min
     
     normalized_keypoints = []
-    img = np.zeros((640, 640, 3), dtype=np.uint8)
-    img.fill(255)
+
     for x, y in keypoints:
-        print("Bbox:", x_min, y_min, width, height)
+        # print("Bbox:", x_min, y_min, width, height)
         x_normalized = ((x/640)-x_min) / width
         y_normalized = ((y/640)-y_min) / height
-        
-        img = cv2.circle(img, (int(x_normalized*640), int(y_normalized*640)), 5, (0, 0, 0), -1)
-        
         normalized_keypoints.extend([x_normalized, y_normalized])
-    
-    cv2.imshow("Normalized Keypoints", img)
-    cv2.waitKey(0)
     
     return normalized_keypoints
     
@@ -215,19 +207,20 @@ def determine_point(frame, cap, pose_classifier: SimpleNNClassifier, point_decid
     elif scorebox_classification == cv2_common.RIGHT_SIDE:
         return POINT_RIGHT
     else:
-        print("Left Keypoints:", left_keypoints)
-        print("Right Keypoints:", right_keypoints)
-        print("Left Fencer Boxes:", fencer_boxes_left)
-        print("Right Fencer Boxes:", fencer_boxes_right)
+        # print("Left Keypoints:", left_keypoints)
+        # print("Right Keypoints:", right_keypoints)
+        # print("Left Fencer Boxes:", fencer_boxes_left)
+        # print("Right Fencer Boxes:", fencer_boxes_right)
         left_keypoints = normalize_keypoints_to_bbox(frame, left_keypoints[0], fencer_boxes_left[0][0])
         right_keypoints = normalize_keypoints_to_bbox(frame, right_keypoints[0], fencer_boxes_right[0][0])
-        print("Normalized Left Keypoints:", left_keypoints)
-        print("Normalized Right Keypoints:", right_keypoints)
+        # print("Normalized Left Keypoints:", left_keypoints)
+        # print("Normalized Right Keypoints:", right_keypoints)
+        left_pose_probs = pose_classifier.predict_probs(torch.as_tensor(left_keypoints, device=pose_classifier.device).unsqueeze(0))
+        right_pose_probs = pose_classifier.predict_probs(torch.as_tensor(right_keypoints, device=pose_classifier.device).unsqueeze(0))
         
-        left_pose_probs = pose_classifier.predict_probs(torch.as_tensor(left_keypoints).squeeze(-1))
-        right_pose_probs = pose_classifier.predict_probs(torch.as_tensor(right_keypoints).squeeze(-1))
+        print("Left Pose Max: ", torch.max(left_pose_probs).item(), "Left Prediction: ", POSES[torch.argmax(left_pose_probs)],"\tRight Pose Max: ", torch.max(right_pose_probs).item(), "Right Prediction: ", POSES[torch.argmax(right_pose_probs)])
         
-        if torch.max(left_pose_probs) > 0.6 and torch.max(right_pose_probs) > 0.6:
+        if torch.max(left_pose_probs) > 0.45 and torch.max(right_pose_probs) > 0.45:
             # Only make a decision if the model is confident
             left_pose = torch.argmax(left_pose_probs)
             right_pose = torch.argmax(right_pose_probs)  
@@ -248,7 +241,8 @@ def main():
     # Load fencer pose model
     fencer_pose_classifier = FencerPoseClassifier(FENCER_POSE_MODEL_PATH)
     # Load pose classifier model
-    pose_classifier = SimpleNNClassifier(POSE_CLASSIFIER_MODEL_PATH)
+    pose_classifier = torch.load(POSE_CLASSIFIER_MODEL_PATH, map_location=torch.device('cpu'))
+    pose_classifier.to(pose_classifier.device)
     # Load point decision tree model
     # point_decider = joblib.load(POINT_DECISION_TREE_PATH)
     
