@@ -73,7 +73,7 @@ def annotate_boxes(annotated_frame, boxes, color, thickness, label_prefix):
             cv2.FONT_HERSHEY_SIMPLEX, 
             1, 
             (0, 0, 0),  # Black text
-            1
+            2
         )
 
 def annotate_keypoints(frame: MatLike, 
