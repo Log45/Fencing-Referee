@@ -58,7 +58,7 @@ class ScoreboxDetectorClassifier:
         img_resized = cv2.resize(img, (640, 640))  # Resize to 640x640 for YOLO input
     
         # Prepare a copy of the input image for labeling
-        img_labeled = img.copy()
+        #img_labeled = img.copy()
 
         # Perform detection
         results = self._detector(img_resized, show=debug)
@@ -93,7 +93,8 @@ class ScoreboxDetectorClassifier:
                 print(f"Detected box with confidence {confidence:.2f}")
 
                 # Save the bounding box info
-                boxes.append(bbox_xyxy_rescaled)
+                this_box = [bbox_xyxy_rescaled, confidence]
+                boxes.append(this_box)
 
                 # Draw bounding box
                 #img_labeled = cv2.rectangle(img_labeled, bbox_xyxy_rescaled[0:2], bbox_xyxy_rescaled[2:4], (0, 255, 0), 3)

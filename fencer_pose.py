@@ -25,6 +25,19 @@ class FencerPoseClassifier:
         self.model = YOLO(model_path)
         print(f"Model loaded from {model_path}")
 
+    def fit_xyxy_to_original_size(self, bbox: list[float], original_size: tuple[int, int]) -> list[int]:
+        # Extract bounding box coordinates
+        x_min, y_min, x_max, y_max = map(int, bbox[:4])
+        
+        # Adjust bounding box to the original image size
+        height, width = original_size
+        x_min = int(x_min * width / 640)
+        y_min = int(y_min * height / 640)
+        x_max = int(x_max * width / 640)
+        y_max = int(y_max * height / 640)
+
+        return [x_min, y_min, x_max, y_max]
+
     def evaluate_on_input(self, input_path, save_output=False):
         """
         Evaluate the model on a single image or a video.
@@ -40,8 +53,10 @@ class FencerPoseClassifier:
             raise ValueError("No model loaded. Please load a model first.")
 
         labeled_frame = None  # Initialize variable for labeled frame(s)
-        boxes = [] # To store fencer bounding box information
-        keypoints = [] # To store fencer keypoint information
+        left_boxes = [] # To store left fencer bounding box information
+        left_keypoints = [] # To store left fencer keypoint information
+        right_boxes = [] # To store right fencer bounding box information
+        right_keypoints = [] # To store right fencer keypoint information
         
         # Check if the input is a numpy array
         if isinstance(input_path, np.ndarray):
@@ -49,6 +64,9 @@ class FencerPoseClassifier:
             if img is None or img.ndim not in [2, 3]:
                 raise ValueError("Invalid numpy array. Expected a valid image array.")
 
+            # Get original size (height, width)
+            original_size = img.shape[:2]
+            
             # Resize the image to 640x640 (YOLOv8 input size)
             img_resized = cv2.resize(img, (640, 640))
 
@@ -56,13 +74,34 @@ class FencerPoseClassifier:
             results = self.model(img_resized)
             for result in results:
                 #print(result.boxes)  # Print detection boxes
-                # Save detection box info
-                this_box = [result.boxes.xyxy.tolist()[0], result.boxes.conf.tolist()[0], result.boxes.cls.tolist()[0]]
-                boxes.append(this_box)
-                # Save keypoints info
-                keypoints.append(result.keypoints.xy.tolist()[0])
 
-                labeled_frame = result.plot()  # Annotated image
+                # Check which fencer is on the left
+                if result.boxes.xyxy.tolist()[0][0] < result.boxes.xyxy.tolist()[1][0]:
+                    left = 0
+                    right = 1
+                else:
+                    left = 1
+                    right = 0
+
+                # Left fencer
+                # Stretch bounding box to match the size of the original image
+                bbox_xyxy_rescaled = self.fit_xyxy_to_original_size(result.boxes.xyxy.tolist()[left], original_size)
+                # Save detection box info
+                this_box = [bbox_xyxy_rescaled, result.boxes.conf.tolist()[left]]
+                left_boxes.append(this_box)
+                # Save keypoints info
+                left_keypoints.append(result.keypoints.xy.tolist()[left])
+
+                # Right fencer
+                # Stretch bounding box to match the size of the original image
+                bbox_xyxy_rescaled = self.fit_xyxy_to_original_size(result.boxes.xyxy.tolist()[right], original_size)
+                # Save detection box info
+                this_box = [bbox_xyxy_rescaled, result.boxes.conf.tolist()[right]]
+                right_boxes.append(this_box)
+                # Save keypoints info
+                right_keypoints.append(result.keypoints.xy.tolist()[right])
+
+                #labeled_frame = result.plot()  # Annotated image
                 if save_output:
                     result.save(filename="result.jpg")  # Save the annotated image
 
@@ -80,7 +119,7 @@ class FencerPoseClassifier:
             results = self.model(img_resized)
             for result in results:
                 print(result.boxes)  # Print detection boxes
-                labeled_frame = result.plot()  # Annotated image
+                #labeled_frame = result.plot()  # Annotated image
                 if save_output:
                     result.save(filename="result.jpg")  # Save the annotated image
 
@@ -127,7 +166,7 @@ class FencerPoseClassifier:
         else:
             raise ValueError("Unsupported file type. Provide an image (.jpg, .png) or video (.mp4, .avi).")
 
-        return labeled_frame, boxes, keypoints
+        return left_boxes, left_keypoints, right_boxes, right_keypoints
 
 
     def train_model(self, dataset_yaml, epochs=100, batch_size=-1, model_name="fencer_pose_model", img_size=640):

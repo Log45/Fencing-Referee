@@ -49,57 +49,65 @@ def get_stream_file(filename: str) -> cv2.VideoCapture:
     return cap
 
 ## Drawing Bounding Boxes and Keypoints
-def draw_bounding_boxes(frame: MatLike, boxes: list, color=(0, 255, 0), thickness=3) -> MatLike:
+
+def annotate_boxes(annotated_frame, boxes, color, thickness, label_prefix):
+        """Helper function to annotate boxes with labels."""
+        for box, confidence in boxes:
+            x_min, y_min, x_max, y_max = map(int, box)
+            # Draw the bounding box
+            cv2.rectangle(annotated_frame, (x_min, y_min), (x_max, y_max), color, thickness)
+            # Create label with confidence
+            label = f"{label_prefix}: {confidence:.2f}"
+            label_size, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
+            label_y_min = max(y_min - 10, 0)  # Ensure label doesn't go off-frame
+            cv2.rectangle(
+                annotated_frame, 
+                (x_min, label_y_min - label_size[1] - baseline),
+                (x_min + label_size[0], label_y_min + baseline),
+                color, 
+                thickness=cv2.FILLED
+            )
+            cv2.putText(
+                annotated_frame, 
+                label, 
+                (x_min, label_y_min), 
+                cv2.FONT_HERSHEY_SIMPLEX, 
+                1, 
+                (0, 0, 0),  # Black text
+                1
+            )
+
+def annotate_frame_with_boxes(frame: MatLike, 
+                              scorebox_boxes: list, 
+                              fencer_boxes_left: list,
+                              fencer_boxes_right: list, 
+                              scorebox_color=(200, 255, 200), 
+                              fencer_color=(255, 200, 200), 
+                              thickness=2) -> MatLike:
     """
-    Draw bounding boxes on a copy of the frame with a label and return the annotated frame.
+    Annotate a frame with bounding boxes for both scoreboxes and fencers.
 
     Args:
         frame (MatLike): The original image/frame.
-        boxes (list): List of bounding boxes, where each box is [x_min, y_min, x_max, y_max].
-        color (tuple): Color of the bounding box in BGR format. Default is green.
+        scorebox_boxes (list): List of scorebox bounding boxes and confidence scores, 
+                               where each entry is [[x_min, y_min, x_max, y_max], confidence].
+        fencer_boxes (list): List of fencer bounding boxes and confidence scores, 
+                             where each entry is [[x_min, y_min, x_max, y_max], confidence].
+        scorebox_color (tuple): Color of the scorebox bounding boxes in BGR format. Default is green.
+        fencer_color (tuple): Color of the fencer bounding boxes in BGR format. Default is blue.
         thickness (int): Thickness of the bounding box lines. Default is 3.
 
     Returns:
-        MatLike: A copy of the frame with bounding boxes and labels drawn.
+        MatLike: A copy of the frame with annotated bounding boxes.
     """
     annotated_frame = frame.copy()  # Create a copy of the original frame
-    label = "scorebox"
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 1
-    font_thickness = 1
-    label_color = (0, 0, 0)  # Black text
 
-    for box in boxes:
-        x_min, y_min, x_max, y_max = map(int, box)
-        
-        # Draw the rectangle
-        cv2.rectangle(annotated_frame, (x_min, y_min), (x_max, y_max), color, thickness)
-        
-        # Determine label position
-        label_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
-        label_x = x_min
-        label_y = y_min - 10 if y_min - 10 > 10 else y_min + 10  # Adjust if label goes out of frame
-        
-        # Draw label background for better visibility
-        cv2.rectangle(
-            annotated_frame,
-            (label_x, label_y - label_size[1] - 2),
-            (label_x + label_size[0] + 2, label_y + 2),
-            color,
-            thickness=cv2.FILLED,
-        )
-        
-        # Draw the label text
-        cv2.putText(
-            annotated_frame,
-            label,
-            (label_x, label_y),
-            font,
-            font_scale,
-            label_color,
-            font_thickness,
-            lineType=cv2.LINE_AA,
-        )
+    # Annotate scoreboxes
+    annotate_boxes(annotated_frame, scorebox_boxes, scorebox_color, thickness, "Scorebox")
+
+    # Annotate fencers
+    annotate_boxes(annotated_frame, fencer_boxes_left, fencer_color, thickness, "Left Fencer")
+    annotate_boxes(annotated_frame, fencer_boxes_right, fencer_color, thickness, "Right Fencer")
 
     return annotated_frame
 
@@ -133,15 +141,17 @@ def main():
         print("Scorebox Boxes:", scorebox_boxes)
 
         # Process frame with fencer pose classification
-        labeled_frame_fencers, fencer_boxes, fencer_keypoints = fencer_pose_classifier.evaluate_on_input(frame)  # Process the same frame
-        print("Fencer Boxes:", fencer_boxes)
-        print("Fencer keypoints:", fencer_keypoints)
+        fencer_boxes_left, fencer_keypoints_left, fencer_boxes_right, fencer_keypoints_right = fencer_pose_classifier.evaluate_on_input(frame)  # Process the same frame
+        print("Left Fencer Boxes:", fencer_boxes_left)
+        print("Left Fencer keypoints:", fencer_keypoints_left)
+        print("Right Fencer Boxes:", fencer_boxes_right)
+        print("Right Fencer keypoints:", fencer_keypoints_right)
 
         # Result of the scorebox classification (left, right, both or none)
         print(f"Scorebox Classification: {scorebox_classification}")
 
         # Draw bounding boxes on the original frame for the scorebox
-        annotated_frame = draw_bounding_boxes(frame, scorebox_boxes)
+        annotated_frame = annotate_frame_with_boxes(frame, scorebox_boxes, fencer_boxes_left, fencer_boxes_right)
         # Resize the frame to reduce width and height by half
         frame_resized = cv2.resize(annotated_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
 
