@@ -150,15 +150,18 @@ def annotate_frame_with_boxes(frame: MatLike,
 
 def interim_point_decider(left_pose, right_pose, left_movement, right_movement):
     # Logic Table for determining the point (preferably will be changed to a DecisionTree in the future)
+    
+    # First check if one of the fencers is retreating
+    if left_movement < -10:
+        return POINT_RIGHT
+    elif right_movement > 10:
+        return POINT_LEFT
+    
     if left_pose == right_pose:
         if left_movement > abs(right_movement):
             return POINT_LEFT
         elif abs(right_movement) > left_movement:
-            return POINT_RIGHT
-    elif left_pose == 2:
-        return POINT_LEFT
-    elif right_pose == 2:
-        return POINT_RIGHT
+            return POINT_RIGHT          
     elif left_pose == 1 and right_pose == 0:
         return POINT_LEFT
     elif left_pose == 0 and right_pose == 1:
@@ -284,10 +287,11 @@ def main():
         # cv2.waitKey(int(1000 / 30))
         if scorebox_classification != cv2_common.NO_SIDE:
             print(POINT_DICT[determine_point(frame, cap, pose_classifier, interim_point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, fencer_keypoints_left, fencer_keypoints_right, left_movement, right_movement)])
-            cv2.waitKey(0) # Pause when a valid classification is found
+            cv2.waitKey(1) # Pause when a valid classification is found
         else:
             cv2.waitKey(1) # Continue running
 
+    cv2.waitKey(0)
     cap.release()
     cv2.destroyAllWindows()
 
