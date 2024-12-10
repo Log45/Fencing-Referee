@@ -8,9 +8,9 @@ from argparse import ArgumentParser, Namespace
 from yolo_scorebox_classifier import ScoreboxDetectorClassifier
 from cv2.typing import MatLike
 from fencer_pose import FencerPoseClassifier
-from classifier_data import normalize_keypoints_to_bbox
 from nn_pose_classifier import SimpleNNClassifier
 import torch
+import numpy as np
 
 ## Constants
 SCOREBOX_MODEL_PATH = 'trained_models/scorebox_detect/scorebox_detect.pt'
@@ -164,18 +164,68 @@ def interim_point_decider(left_pose, right_pose, left_movement, right_movement):
 
     return NO_POINT
 
-def determine_point(pose_classifier: SimpleNNClassifier, point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, left_keypoints, right_keypoints, left_movement, right_movement):
+def normalize_keypoints_to_bbox(img, keypoints, bbox, imgsize=(640, 640)):
+    """
+    Normalize keypoints to a bounding box.
+    
+    Parameters:
+        keypoints (list of tuples): List of keypoints [(x, y), ...], un-normalized.
+        bbox (tuple): Bounding box in (x1 y1 x2 y2), un-normalized.
+    
+    Returns:
+        list of tuples: Keypoints normalized to the bounding box.
+    """
+    
+    print(img.shape)
+    
+    h, w, _ = img.shape
+    
+    x1, y1, x2, y2 = bbox
+    
+    x_min = x1 / w
+    x_max = x2 / w
+    y_min = y1 / h
+    y_max = y2 / h
+    
+    width = x_max - x_min
+    height = y_max - y_min
+    
+    normalized_keypoints = []
+    img = np.zeros((640, 640, 3), dtype=np.uint8)
+    img.fill(255)
+    for x, y in keypoints:
+        print("Bbox:", x_min, y_min, width, height)
+        x_normalized = ((x/640)-x_min) / width
+        y_normalized = ((y/640)-y_min) / height
+        
+        img = cv2.circle(img, (int(x_normalized*640), int(y_normalized*640)), 5, (0, 0, 0), -1)
+        
+        normalized_keypoints.extend([x_normalized, y_normalized])
+    
+    cv2.imshow("Normalized Keypoints", img)
+    cv2.waitKey(0)
+    
+    return normalized_keypoints
+    
+
+def determine_point(frame, cap, pose_classifier: SimpleNNClassifier, point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, left_keypoints, right_keypoints, left_movement, right_movement):
     # Logic Table for determining the point
     if scorebox_classification == cv2_common.LEFT_SIDE:
         return POINT_LEFT
     elif scorebox_classification == cv2_common.RIGHT_SIDE:
         return POINT_RIGHT
     else:
-        left_keypoints = normalize_keypoints_to_bbox(left_keypoints, fencer_boxes_left)
-        right_keypoints = normalize_keypoints_to_bbox(right_keypoints, fencer_boxes_right)
+        print("Left Keypoints:", left_keypoints)
+        print("Right Keypoints:", right_keypoints)
+        print("Left Fencer Boxes:", fencer_boxes_left)
+        print("Right Fencer Boxes:", fencer_boxes_right)
+        left_keypoints = normalize_keypoints_to_bbox(frame, left_keypoints[0], fencer_boxes_left[0][0])
+        right_keypoints = normalize_keypoints_to_bbox(frame, right_keypoints[0], fencer_boxes_right[0][0])
+        print("Normalized Left Keypoints:", left_keypoints)
+        print("Normalized Right Keypoints:", right_keypoints)
         
-        left_pose_probs = pose_classifier.predict_probs(left_keypoints)
-        right_pose_probs = pose_classifier.predict_probs(right_keypoints)
+        left_pose_probs = pose_classifier.predict_probs(torch.as_tensor(left_keypoints).squeeze(-1))
+        right_pose_probs = pose_classifier.predict_probs(torch.as_tensor(right_keypoints).squeeze(-1))
         
         if torch.max(left_pose_probs) > 0.6 and torch.max(right_pose_probs) > 0.6:
             # Only make a decision if the model is confident
@@ -239,8 +289,8 @@ def main():
         cv2.imshow('stream', frame_resized)
         # cv2.waitKey(int(1000 / 30))
         if scorebox_classification != cv2_common.NO_SIDE:
+            print(POINT_DICT[determine_point(frame, cap, pose_classifier, interim_point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, fencer_keypoints_left, fencer_keypoints_right, left_movement, right_movement)])
             cv2.waitKey(0) # Pause when a valid classification is found
-            print(POINT_DICT[determine_point(pose_classifier, interim_point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, fencer_keypoints_left, fencer_keypoints_right, left_movement, right_movement)])
         else:
             cv2.waitKey(1) # Continue running
 

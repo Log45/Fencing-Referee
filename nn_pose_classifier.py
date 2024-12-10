@@ -14,7 +14,7 @@ class SimpleNNClassifier(nn.Module):
         super(SimpleNNClassifier, self).__init__()
         self.device = device
         if path is not None:
-            self.load(path).to(device)
+            self.load(path)
         else:
             self.model = nn.Sequential(
                 nn.Linear(input_size, 128),          # Fully connected layer with 128 units
@@ -26,7 +26,8 @@ class SimpleNNClassifier(nn.Module):
                 nn.BatchNorm1d(64),
                 nn.Dropout(0.3),
                 nn.Linear(64, num_classes),          # Output layer with num_classes units
-            ).to(device)
+            )
+        self.model.to(self.device)
     
     def forward(self, x: torch.Tensor):
         return self.model(x.to(self.device))
@@ -39,10 +40,10 @@ class SimpleNNClassifier(nn.Module):
         return acc
     
     def predict(self, x):
-        return torch.softmax(self.forward(x), dim=1).argmax(dim=1)
+        return torch.softmax(self.forward(x.to(self.device)), dim=1).argmax(dim=1)
     
     def predict_probs(self, x):
-        return torch.softmax(self.forward(x), dim=1)
+        return torch.softmax(self.forward(x.to(self.device)), dim=1)
     
     def fit(self, X, y, epochs=100):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
