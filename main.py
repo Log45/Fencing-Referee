@@ -154,13 +154,13 @@ def interim_point_decider(left_pose, right_pose, left_movement, right_movement):
     # First check if one of the fencers is retreating
     if left_movement < -10:
         return POINT_RIGHT
-    elif right_movement > 10:
+    elif right_movement < -10:
         return POINT_LEFT
     
     if left_pose == right_pose:
-        if left_movement > abs(right_movement):
+        if left_movement > right_movement:
             return POINT_LEFT
-        elif abs(right_movement) > left_movement:
+        elif right_movement > left_movement:
             return POINT_RIGHT          
     elif left_pose == 1 and right_pose == 0:
         return POINT_LEFT

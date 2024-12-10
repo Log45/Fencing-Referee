@@ -1,7 +1,8 @@
 scikit-learn
 joblib
 tqdm
-opencv-python-headless
+opencv-python
+ultralytics
 inference
 supervision
 onnx
