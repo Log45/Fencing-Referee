@@ -1,4 +1,5 @@
 from ultralytics import YOLO
+from ultralytics.engine.results import Results
 import cv2
 from cv2.typing import MatLike
 import numpy as np
@@ -40,8 +41,8 @@ class FencerPoseClassifier:
             raise ValueError("No model loaded. Please load a model first.")
 
         labeled_frame = None  # Initialize variable for labeled frame(s)
-        boxes = [] # To store fencer bounding box information
-        keypoints = [] # To store fencer keypoint information
+        boxes: list[tuple[list[float], float, float]] = [] # To store fencer bounding box information
+        keypoints: list[list[tuple[float, float]]] = [] # To store fencer keypoint information
         
         # Check if the input is a numpy array
         if isinstance(input_path, np.ndarray):
@@ -53,7 +54,7 @@ class FencerPoseClassifier:
             img_resized = cv2.resize(img, (640, 640))
 
             # Perform inference
-            results = self.model(img_resized)
+            results: Results = self.model(img_resized)
             for result in results:
                 #print(result.boxes)  # Print detection boxes
                 # Save detection box info
@@ -127,6 +128,11 @@ class FencerPoseClassifier:
         else:
             raise ValueError("Unsupported file type. Provide an image (.jpg, .png) or video (.mp4, .avi).")
 
+        # Perform final transformations back to source size
+        img_size = img.shape[:2]
+        boxes = list(map(lambda box_data: (self.fit_xyxy_to_original_size(box_data[0], img_size), box_data[1], box_data[2]), boxes))
+        keypoints = list(map(lambda points: self.fit_points_to_original_size(points, img_size), keypoints))
+
         return labeled_frame, boxes, keypoints
 
 
@@ -168,6 +174,27 @@ class FencerPoseClassifier:
 
         self.model.export(format=format)
         print(f"Model exported in {format} format")
+
+    def fit_xyxy_to_original_size(self, bbox: list[float], original_size: tuple[int, int]) -> list[int]:
+        # Extract bounding box coordinates
+        x_min, y_min, x_max, y_max = map(int, bbox[:4])
+        
+        # Adjust bounding box to the original image size
+        height, width = original_size
+        x_min = int(x_min * width / 640)
+        y_min = int(y_min * height / 640)
+        x_max = int(x_max * width / 640)
+        y_max = int(y_max * height / 640)
+
+        return [x_min, y_min, x_max, y_max]
+    
+    def fit_points_to_original_size(self, points: list[tuple[float, float]], original_size: tuple[int, int]) -> list[int]:
+        # Extract points
+        points_ints = map(lambda tup: (int(tup[0]), int(tup[1])), points)
+
+        # Scale points
+        height, width = original_size
+        return list(map(lambda tup: (int(tup[0] * width / 640), int(tup[1] * height / 640)), points_ints))
 
 def main():
     fencer_classifier = FencerPoseClassifier()

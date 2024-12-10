@@ -103,6 +103,69 @@ def draw_bounding_boxes(frame: MatLike, boxes: list, color=(0, 255, 0), thicknes
 
     return annotated_frame
 
+def draw_keypoints(frame: MatLike, keypoints: list[list[tuple[float, float]]], color=(0, 0, 255), keypoint_radius=5, bone_thickness=2) -> MatLike:
+    # Define a graph of nodes (keypoints) and edges (bones) to draw
+    nodes: dict[str, int] = {
+        'head': 0,
+        'left-elbow': 1,
+        'left-foot': 2,
+        'left-hip': 3,
+        'left-knee': 4,
+        'left-shoulder': 5,
+        'left-wrist': 6,
+        'right-elbow': 7,
+        'right-foot': 8,
+        'right-hip': 9,
+        'right-knee': 10,
+        'right-shoulder': 11,
+        'right-wrist': 12
+    }
+    bones: list[tuple[str, str]] = [
+        ('head', 'left-shoulder'),
+        ('head', 'right-shoulder'),
+        ('left-shoulder', 'left-elbow'),
+        ('left-shoulder', 'left-hip'),
+        ('left-elbow', 'left-wrist'),
+        ('right-shoulder', 'right-elbow'),
+        ('right-shoulder', 'right-hip'),
+        ('right-elbow', 'right-wrist'),
+        ('left-hip', 'right-hip'),
+        ('left-hip', 'left-knee'),
+        ('left-knee', 'left-foot'),
+        ('right-hip', 'right-knee'),
+        ('right-knee', 'right-foot')
+    ]
+
+    # Draw nodes
+    output = frame.copy()
+    for fencer in keypoints:
+        for node_name, node_idx in nodes.items():
+            node_pos = fencer[node_idx]
+            node_pos_ints = (int(node_pos[0]), int(node_pos[1]))
+            node_color: tuple[int, int, int]
+            if node_name.startswith('left-'):
+                node_color = (255, 0, 255)
+            elif node_name.startswith('right-'):
+                node_color = (0, 0, 255)
+            else:
+                node_color = (0, 255, 0)
+            output = cv2.circle(output, node_pos_ints, keypoint_radius, node_color, -1)
+    
+    # Draw bones
+    for fencer in keypoints:
+        for bone in bones:
+            start_idx = nodes[bone[0]]
+            start_pos = fencer[start_idx]
+            start_pos_ints = (int(start_pos[0]), int(start_pos[1]))
+
+            end_idx = nodes[bone[1]]
+            end_pos = fencer[end_idx]
+            end_pos_ints = (int(end_pos[0]), int(end_pos[1]))
+
+            output = cv2.line(output, start_pos_ints, end_pos_ints, (0, 0, 127), bone_thickness)
+    
+    return output
+
 
 ## Main Processing Loop
 
@@ -119,42 +182,61 @@ def main():
     fencer_pose_classifier = FencerPoseClassifier(FENCER_POSE_MODEL_PATH)
 
     # Open video stream
-    cap: cv2.VideoCapture = get_stream(args)
+    # cap: cv2.VideoCapture = get_stream(args)
 
-    while cap.isOpened():
-        # Get the next frame
-        ret, frame = cap.read()
-        if not ret:
-            print('Stream ended; closing...')
-            break
+    # while cap.isOpened():
+    #     # Get the next frame
+    #     ret, frame = cap.read()
+    #     if not ret:
+    #         print('Stream ended; closing...')
+    #         break
 
-        # Process frame with scorebox detection
-        scorebox_classification, scorebox_boxes = scorebox_detector.detect_and_classify(frame, debug=False)
-        print("Scorebox Boxes:", scorebox_boxes)
+    #     # Process frame with scorebox detection
+    #     scorebox_classification, scorebox_boxes = scorebox_detector.detect_and_classify(frame, debug=False)
+    #     print("Scorebox Boxes:", scorebox_boxes)
 
-        # Process frame with fencer pose classification
-        labeled_frame_fencers, fencer_boxes, fencer_keypoints = fencer_pose_classifier.evaluate_on_input(frame)  # Process the same frame
-        print("Fencer Boxes:", fencer_boxes)
-        print("Fencer keypoints:", fencer_keypoints)
+    #     # Process frame with fencer pose classification
+    #     labeled_frame_fencers, fencer_boxes, fencer_keypoints = fencer_pose_classifier.evaluate_on_input(frame)  # Process the same frame
+    #     print("Fencer Boxes:", fencer_boxes)
+    #     print("Fencer keypoints:", fencer_keypoints)
 
-        # Result of the scorebox classification (left, right, both or none)
-        print(f"Scorebox Classification: {scorebox_classification}")
+    #     # Result of the scorebox classification (left, right, both or none)
+    #     print(f"Scorebox Classification: {scorebox_classification}")
 
-        # Draw bounding boxes on the original frame for the scorebox
-        annotated_frame = draw_bounding_boxes(frame, scorebox_boxes)
-        # Resize the frame to reduce width and height by half
-        frame_resized = cv2.resize(annotated_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
+    #     # Draw bounding boxes on the original frame for the scorebox
+    #     annotated_frame = draw_bounding_boxes(frame, scorebox_boxes)
+    #     annotated_frame = draw_keypoints(annotated_frame, fencer_keypoints)
+    #     # Resize the frame to reduce width and height by half
+    #     frame_resized = cv2.resize(annotated_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
 
-        # Display the frame and wait for 1/30th of a second
-        cv2.imshow('stream', frame_resized)
-        # cv2.waitKey(int(1000 / 30))
-        if scorebox_classification != cv2_common.NO_SIDE:
-            cv2.waitKey(0) # Pause when a valid classification is found
-        else:
-            cv2.waitKey(1) # Continue running
+    #     # Display the frame and wait for 1/30th of a second
+    #     cv2.imshow('stream', frame_resized)
+    #     # cv2.waitKey(int(1000 / 30))
+    #     if scorebox_classification != cv2_common.NO_SIDE:
+    #         cv2.waitKey(0) # Pause when a valid classification is found
+    #     else:
+    #         cv2.waitKey(0) # Continue running
 
-    cap.release()
-    cv2.destroyAllWindows()
+    # cap.release()
+    # cv2.destroyAllWindows()
+
+    img = cv2.imread("datasets/fencers/valid/images/0_0_jpg.rf.be88a72c7ba6419c6e1d3e95fbed280e.jpg")
+    height, width = img.shape[:2]
+
+    keypoints_raw = [
+        [(0.3425408854166666, 0.40098203703703705), (0.3277820833333333, 0.4162481481481481), (0.3387653645833333, 0.4272397222222222), (0.32400661458333335, 0.430292962962963), (0.32558291666666667, 0.4777829629629629), (0.35112156250000004, 0.4534975), (0.37034229166666666, 0.4480016666666666), (0.32469307291666666, 0.4644941666666667), (0.3387653645833333, 0.4718219444444444), (0.32160401041666664, 0.49991157407407405), (0.31817171874999994, 0.5408247222222221), (0.35729963541666665, 0.4919731481481481), (0.35489708333333325, 0.5334970370370369)],
+        [(0.5992749479166666, 0.4003426851851851), (0.6130040104166665, 0.4192726851851852), (0.5944697395833334, 0.4180513888888888), (0.6184956770833333, 0.4382026851851851), (0.6092285416666667, 0.4583539814814814), (0.59069421875, 0.4369813888888888), (0.57696515625, 0.4382026851851851), (0.6109446354166665, 0.4589646296296296), (0.5975588020833332, 0.4546900925925925), (0.61472015625, 0.4919394444444444), (0.6178092187499999, 0.5175864814814813), (0.5865755208333333, 0.4931606481481482), (0.5858890625, 0.526135462962963)]
+    ]
+    keypoints: list[list[tuple]] = []
+    for fencer in keypoints_raw:
+        fencer_points = []
+        for point in fencer:
+            fencer_points.append((point[0] * width, point[1] * height))
+        keypoints.append(fencer_points)
+    
+    drawn_img = draw_keypoints(img, keypoints)
+    cv2.imshow('img', drawn_img)
+    cv2.waitKey(0)
 
 
 if __name__ == "__main__":

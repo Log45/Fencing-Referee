@@ -1,19 +1,19 @@
 # IMPORTANT: Local dirs don't work here, you have to change this to match your directory structure!!!!
-train: "C:\\Users\\alynf\\OneDrive\\Documents\\Fencing-Referee\\datasets\\fencers\\train\\images"
-val: "C:\\Users\\alynf\\OneDrive\\Documents\\Fencing-Referee\\datasets\\fencers\\valid\\images"
-test: "C:\\Users\\alynf\\OneDrive\\Documents\\Fencing-Referee\\datasets\\fencers\\test\\images"
+train: "C:\\Users\\clair\\iste501-repos\\Fencing-Referee\\datasets\\fencers\\train\\images"
+val: "C:\\Users\\clair\\iste501-repos\\Fencing-Referee\\datasets\\fencers\\valid\\images"
+test: "C:\\Users\\clair\\iste501-repos\\Fencing-Referee\\datasets\\fencers\\test\\images"
 
 kpt_shape: [13, 2]
 flip_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-nc: 2
+nc: 1
 # Classes dictionary
-names: ['fencer', 'saber']
+names: ['fencer']
 
 # Add keypoints configuration
 keypoints:
   number: 13  # Maximum keypoints across all classes
-  labels: [ 'head', 'left-elbow', 'left-foot', 'left-hip', 'left-knee', 'left-shoulder', 'left-wrist', 'right-elbow', 'right-foot', 'right-hip', 'right-knee', right-shoulder', 'right-wrist']
+  labels: [ 'head', 'left-elbow', 'left-foot', 'left-hip', 'left-knee', 'left-shoulder', 'left-wrist', 'right-elbow', 'right-foot', 'right-hip', 'right-knee', 'right-shoulder', 'right-wrist']
 
 roboflow:
   workspace: ai-fencing-5vbck
