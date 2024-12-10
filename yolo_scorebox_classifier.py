@@ -41,7 +41,7 @@ class ScoreboxDetectorClassifier:
 
         return [x_min, y_min, x_max, y_max]
 
-    def detect_and_classify(self, img: MatLike, debug: bool = False) -> tuple[str, MatLike]:
+    def detect_and_classify(self, img: MatLike, debug: bool = False):
         """
         Detect scoreboxes in an image using YOLO and classify using thresholding.
         
@@ -66,6 +66,9 @@ class ScoreboxDetectorClassifier:
         # Initialize the classifier
         classifier = ScoreboxThresholdClassifier()
 
+        # To store the bounding boxes
+        boxes = []
+
         # Process each detected box
         classification: str = cv2_common.BOTH_SIDES
         for result in results:
@@ -89,8 +92,11 @@ class ScoreboxDetectorClassifier:
             if confidence > 0.5:
                 print(f"Detected box with confidence {confidence:.2f}")
 
+                # Save the bounding box info
+                boxes.append(bbox_xyxy_rescaled)
+
                 # Draw bounding box
-                img_labeled = cv2.rectangle(img_labeled, bbox_xyxy_rescaled[0:2], bbox_xyxy_rescaled[2:4], (0, 255, 0), 3)
+                #img_labeled = cv2.rectangle(img_labeled, bbox_xyxy_rescaled[0:2], bbox_xyxy_rescaled[2:4], (0, 255, 0), 3)
 
                 # Crop the detected bounding box region adjusted to the original image size
                 cropped_img = self.crop_image_with_bbox(img, bbox_xyxy, original_size)
@@ -103,7 +109,7 @@ class ScoreboxDetectorClassifier:
                 classification = classifier.classify(cropped_img, show_images=debug)
                 print(f"Classification result: {classification}")
         
-        return classification, img_labeled 
+        return classification, boxes
     
     def train_new_model():
         """

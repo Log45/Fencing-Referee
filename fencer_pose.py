@@ -25,7 +25,7 @@ class FencerPoseClassifier:
         self.model = YOLO(model_path)
         print(f"Model loaded from {model_path}")
 
-    def evaluate_on_input(self, input_path, save_output=False) -> MatLike:
+    def evaluate_on_input(self, input_path, save_output=False):
         """
         Evaluate the model on a single image or a video.
 
@@ -40,6 +40,8 @@ class FencerPoseClassifier:
             raise ValueError("No model loaded. Please load a model first.")
 
         labeled_frame = None  # Initialize variable for labeled frame(s)
+        boxes = [] # To store fencer bounding box information
+        keypoints = [] # To store fencer keypoint information
         
         # Check if the input is a numpy array
         if isinstance(input_path, np.ndarray):
@@ -53,7 +55,13 @@ class FencerPoseClassifier:
             # Perform inference
             results = self.model(img_resized)
             for result in results:
-                print(result.boxes)  # Print detection boxes
+                #print(result.boxes)  # Print detection boxes
+                # Save detection box info
+                this_box = [result.boxes.xyxy.tolist()[0], result.boxes.conf.tolist()[0], result.boxes.cls.tolist()[0]]
+                boxes.append(this_box)
+                # Save keypoints info
+                keypoints.append(result.keypoints.xy.tolist()[0])
+
                 labeled_frame = result.plot()  # Annotated image
                 if save_output:
                     result.save(filename="result.jpg")  # Save the annotated image
@@ -119,7 +127,7 @@ class FencerPoseClassifier:
         else:
             raise ValueError("Unsupported file type. Provide an image (.jpg, .png) or video (.mp4, .avi).")
 
-        return labeled_frame
+        return labeled_frame, boxes, keypoints
 
 
     def train_model(self, dataset_yaml, epochs=100, batch_size=-1, model_name="fencer_pose_model", img_size=640):
