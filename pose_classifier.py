@@ -32,7 +32,7 @@ def main():
     X = data[:, :-1]
     y = data[:, -1]
     
-    clf = PoseClassifier(n_estimators=200)
+    clf = PoseClassifier(n_estimators=100)
     clf.train(X, y)
     
 if __name__ == "__main__":
