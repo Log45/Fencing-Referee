@@ -41,6 +41,8 @@ def preprocess_data(input_file, output_file, mode):
         for line in lines:
             data = line.strip().split()
             if mode == 'fencers':
+                if data[0] == "1":  # Skip sabers
+                    continue
                 if data[0] == "2":  # Skip scoreboxes
                     continue
                 class_id, x_min, y_min, x_max, y_max = data[:5]  # convert_xywh_to_xyxy(data)
