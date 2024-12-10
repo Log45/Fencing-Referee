@@ -149,8 +149,8 @@ def annotate_frame_with_boxes(frame: MatLike,
     annotate_boxes(annotated_frame, scorebox_boxes, scorebox_color, thickness, "Scorebox")
 
     # Annotate fencers
-    annotate_boxes(annotated_frame, fencer_boxes_left, fencer_color, thickness, "Left Fencer")
-    annotate_boxes(annotated_frame, fencer_boxes_right, fencer_color, thickness, "Right Fencer")
+    annotate_boxes(annotated_frame, fencer_boxes_left, (255, 200, 200), thickness, "Left Fencer")
+    annotate_boxes(annotated_frame, fencer_boxes_right, (200, 200, 255), thickness, "Right Fencer")
 
     # Annotate keypoints
     annotate_keypoints(annotated_frame, fencer_keypoints_left, 

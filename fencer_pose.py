@@ -54,7 +54,7 @@ class FencerPoseClassifier:
             y = int(y * height / 640)
             
             result.append([x, y])
-            
+
         return result
 
     def evaluate_on_input(self, input_path, save_output=False):
@@ -96,6 +96,9 @@ class FencerPoseClassifier:
             results = self.model(img_resized)
             for result in results:
                 #print(result.boxes)  # Print detection boxes
+
+                if len(result.boxes.xyxy.tolist()) < 2:
+                    continue
 
                 # Check which fencer is on the left
                 if result.boxes.xyxy.tolist()[0][0] < result.boxes.xyxy.tolist()[1][0]:
