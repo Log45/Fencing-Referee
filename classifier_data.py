@@ -3,6 +3,45 @@ from pathlib import Path
 import yaml
 import numpy as np
 
+def normalize_keypoints_to_bbox(keypoints, bbox):
+    """
+    Normalize keypoints to a bounding box.
+    
+    Parameters:
+        keypoints (list of tuples): List of keypoints [(x, y), ...], normalized to the image.
+        bbox (tuple): Bounding box in (x_center, y_center, width, height), normalized to the image.
+    
+    Returns:
+        list of tuples: Keypoints normalized to the bounding box.
+    """
+    keypoint_tuples = []
+ 
+    for i, x in enumerate(keypoints):
+        if i % 2 == 0:
+            # cv2.circle(img, (int(float(x) * 640), int(float(keypoints[i+1]) * 640)), 5, (0, 0, 0), -1)
+            keypoint_tuples.append((x, keypoints[i+1]))
+    
+    x_center, y_center, width, height = bbox
+    x_center = float(x_center)
+    y_center = float(y_center)
+    width = float(width)
+    height = float(height)
+    
+    x_min = x_center - width / 2
+    x_max = x_center + width / 2
+    y_min = y_center - height / 2
+    y_max = y_center + height / 2
+    
+    normalized_keypoints = []
+    for x, y in keypoint_tuples:
+        x = float(x)
+        y = float(y)
+        x_normalized = (x - x_min) / width
+        y_normalized = (y - y_min) / height
+        normalized_keypoints.extend([x_normalized, y_normalized])
+        
+    return normalized_keypoints
+
 def generate_training_data():
     """
     Read the pose classification dataset and return the data and classes.
@@ -53,7 +92,7 @@ def generate_training_data():
                 for line in f:
                     splt = line.strip().split()
                     if splt[0] == "0":
-                        sub.append((splt[1], splt[5:]))
+                        sub.append((splt[1], normalize_keypoints_to_bbox(splt[5:], splt[1:5])))
                 pose_label_list.append(sub)
                     
     
@@ -65,7 +104,7 @@ def generate_training_data():
                 for line in f:
                     splt = line.strip().split()
                     if splt[0] == "0":
-                        sub.append((splt[1], splt[5:]))
+                        sub.append((splt[1], normalize_keypoints_to_bbox(splt[5:], splt[1:5])))
                 pose_label_list.append(sub)
     
     for label in val_labels:
@@ -76,7 +115,7 @@ def generate_training_data():
                 for line in f:
                     splt = line.strip().split()
                     if splt[0] == "0":
-                        sub.append((splt[1], splt[5:]))
+                        sub.append((splt[1], normalize_keypoints_to_bbox(splt[5:], splt[1:5])))
                 pose_label_list.append(sub)
     
     file_to_label = {}
