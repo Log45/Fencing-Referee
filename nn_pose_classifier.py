@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 
 import numpy as np
-import matplotlib.pyplot as plt
-import cv2
 
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
@@ -12,20 +10,23 @@ from classifier_data import generate_training_data
 
 # Define the neural network
 class SimpleNNClassifier(nn.Module):
-    def __init__(self, input_size=26, num_classes=4, device="cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"):
+    def __init__(self, path = None, input_size=26, num_classes=4, device="cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"):
         super(SimpleNNClassifier, self).__init__()
         self.device = device
-        self.model = nn.Sequential(
-            nn.Linear(input_size, 128),          # Fully connected layer with 128 units
-            nn.ReLU(),                           # Non-linear activation
-            nn.BatchNorm1d(128),                 # Batch normalization
-            nn.Dropout(0.3),                     # Dropout for regularization
-            nn.Linear(128, 64),                  # Second fully connected layer
-            nn.ReLU(),
-            nn.BatchNorm1d(64),
-            nn.Dropout(0.3),
-            nn.Linear(64, num_classes),          # Output layer with num_classes units
-        ).to(device)
+        if path is not None:
+            self.load(path).to(device)
+        else:
+            self.model = nn.Sequential(
+                nn.Linear(input_size, 128),          # Fully connected layer with 128 units
+                nn.ReLU(),                           # Non-linear activation
+                nn.BatchNorm1d(128),                 # Batch normalization
+                nn.Dropout(0.3),                     # Dropout for regularization
+                nn.Linear(128, 64),                  # Second fully connected layer
+                nn.ReLU(),
+                nn.BatchNorm1d(64),
+                nn.Dropout(0.3),
+                nn.Linear(64, num_classes),          # Output layer with num_classes units
+            ).to(device)
     
     def forward(self, x: torch.Tensor):
         return self.model(x.to(self.device))
@@ -39,6 +40,9 @@ class SimpleNNClassifier(nn.Module):
     
     def predict(self, x):
         return torch.softmax(self.forward(x), dim=1).argmax(dim=1)
+    
+    def predict_probs(self, x):
+        return torch.softmax(self.forward(x), dim=1)
     
     def fit(self, X, y, epochs=100):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
@@ -71,6 +75,9 @@ class SimpleNNClassifier(nn.Module):
                 print(f"Epoch {epoch}, Loss: {loss:.5f},  Accuracy: {acc:.2f}% | Test Loss: {test_loss:.5f}, Test Accuracy: {test_acc:.2f}%")
         
         print(classification_report(y_test.cpu().numpy(), self.predict(X_test).cpu().numpy()))
+    
+    def load(self, path):
+        self.model = torch.load(path)
 
 def main():
     # Load the data

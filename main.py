@@ -8,10 +8,25 @@ from argparse import ArgumentParser, Namespace
 from yolo_scorebox_classifier import ScoreboxDetectorClassifier
 from cv2.typing import MatLike
 from fencer_pose import FencerPoseClassifier
+from classifier_data import normalize_keypoints_to_bbox
+from nn_pose_classifier import SimpleNNClassifier
+import torch
 
 ## Constants
 SCOREBOX_MODEL_PATH = 'trained_models/scorebox_detect/scorebox_detect.pt'
 FENCER_POSE_MODEL_PATH = 'trained_models/fencer_keypoint/fencer_keypoint.pt'
+POSE_CLASSIFIER_MODEL_PATH = 'trained_models/pose_classifier/pose_classifier.pth'
+POINT_DECISION_TREE_PATH = None # 'trained_models/point_decider/point_decider.pkl'
+
+NO_POINT = 0
+POINT_LEFT = 1
+POINT_RIGHT = 2
+
+POINT_DICT = {
+    NO_POINT: "No Point",
+    POINT_LEFT: "Left Fencer",
+    POINT_RIGHT: "Right Fencer"
+}
 
 ## Functions for Stream Handling
 
@@ -49,7 +64,6 @@ def get_stream_file(filename: str) -> cv2.VideoCapture:
     return cap
 
 ## Drawing Bounding Boxes and Keypoints
-import cv2
 
 def annotate_boxes(annotated_frame, boxes, color, thickness, label_prefix):
     """Helper function to annotate boxes with labels."""
@@ -132,6 +146,44 @@ def annotate_frame_with_boxes(frame: MatLike,
 
     return annotated_frame
 
+def interim_point_decider(left_pose, right_pose, left_movement, right_movement):
+    # Logic Table for determining the point (preferably will be changed to a DecisionTree in the future)
+    if left_pose == right_pose:
+        if left_movement > right_movement:
+            return POINT_LEFT
+        elif right_movement > left_movement:
+            return POINT_RIGHT
+    elif left_pose == 2:
+        return POINT_LEFT
+    elif right_pose == 2:
+        return POINT_RIGHT
+    elif left_pose == 1 and right_pose == 0:
+        return POINT_LEFT
+    elif left_pose == 0 and right_pose == 1:
+        return POINT_RIGHT
+
+    return NO_POINT
+
+def determine_point(pose_classifier: SimpleNNClassifier, point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, left_keypoints, right_keypoints, left_movement, right_movement):
+    # Logic Table for determining the point
+    if scorebox_classification == cv2_common.LEFT_SIDE:
+        return POINT_LEFT
+    elif scorebox_classification == cv2_common.RIGHT_SIDE:
+        return POINT_RIGHT
+    else:
+        left_keypoints = normalize_keypoints_to_bbox(left_keypoints, fencer_boxes_left)
+        right_keypoints = normalize_keypoints_to_bbox(right_keypoints, fencer_boxes_right)
+        
+        left_pose_probs = pose_classifier.predict_probs(left_keypoints)
+        right_pose_probs = pose_classifier.predict_probs(right_keypoints)
+        
+        if torch.max(left_pose_probs) > 0.6 and torch.max(right_pose_probs) > 0.6:
+            # Only make a decision if the model is confident
+            left_pose = torch.argmax(left_pose_probs)
+            right_pose = torch.argmax(right_pose_probs)  
+            return point_decider(left_pose, right_pose, left_movement, right_movement)
+    return NO_POINT
+
 ## Main Processing Loop
 
 def main():
@@ -145,6 +197,11 @@ def main():
     scorebox_detector = ScoreboxDetectorClassifier(SCOREBOX_MODEL_PATH)
     # Load fencer pose model
     fencer_pose_classifier = FencerPoseClassifier(FENCER_POSE_MODEL_PATH)
+    # Load pose classifier model
+    pose_classifier = SimpleNNClassifier(POSE_CLASSIFIER_MODEL_PATH)
+    # Load point decision tree model
+    # point_decider = joblib.load(POINT_DECISION_TREE_PATH)
+    
 
     # Open video stream
     cap: cv2.VideoCapture = get_stream(args)
@@ -183,6 +240,7 @@ def main():
         # cv2.waitKey(int(1000 / 30))
         if scorebox_classification != cv2_common.NO_SIDE:
             cv2.waitKey(0) # Pause when a valid classification is found
+            print(POINT_DICT[determine_point(pose_classifier, interim_point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, fencer_keypoints_left, fencer_keypoints_right, left_movement, right_movement)])
         else:
             cv2.waitKey(1) # Continue running
 

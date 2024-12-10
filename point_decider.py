@@ -4,14 +4,17 @@ from sklearn.ensemble import RandomForestClassifier
 
 from classifier_data import generate_training_data
 
-class PoseClassifier:
-    def __init__(self, n_estimators=1):
-        self.model = RandomForestClassifier(n_estimators=n_estimators)
+class PointDecider:
+    def __init__(self, path = None, n_estimators=1):
+        if path is not None:
+            self.load(path)
+        else:
+            self.model = RandomForestClassifier(n_estimators=n_estimators)
 
-    def save(self, path = "trained_models/pose_classifier/pose_classifier.pkl"):
+    def save(self, path = "trained_models/point_decider/point_decider.pkl"):
         joblib.dump(self.model, path)
         
-    def load(self, path = "trained_models/pose_classifier/pose_classifier.pkl"):    
+    def load(self, path = "trained_models/point_decider/point_decider.pkl"):    
         self.model = joblib.load(path)
         
     def train(self, X, y):
@@ -25,15 +28,4 @@ class PoseClassifier:
     
     def predict(self, X):
         return self.model.predict(X)
-
-def main(): 
-    data, classes = generate_training_data()
     
-    X = data[:, :-1]
-    y = data[:, -1]
-    
-    clf = PoseClassifier(n_estimators=300)
-    clf.train(X, y)
-    
-if __name__ == "__main__":
-    main()
