@@ -1,0 +1,1 @@
+docker run --gpus all --name fencing-ref1 fencing-ref1:latest python main.py --headless --mode "webcam"

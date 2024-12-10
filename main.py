@@ -237,7 +237,10 @@ def main():
     parser = ArgumentParser(prog="Fencing-Referee", description="Automatically scores fencing bouts")
     parser.add_argument('-m', '--mode', choices=['webcam', 'file'], required=False)
     parser.add_argument('-f', '--filename', required=False)
+    parser.add_argument('--headless', action='store_true', required=False)
     args = parser.parse_args()
+    
+    headless = args.headless
 
     # Load scorebox model
     scorebox_detector = ScoreboxDetectorClassifier(SCOREBOX_MODEL_PATH)
@@ -283,17 +286,16 @@ def main():
         frame_resized = cv2.resize(annotated_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
 
         # Display the frame and wait for 1/30th of a second
-        cv2.imshow('stream', frame_resized)
+        if not headless:
+            cv2.imshow('stream', frame_resized)
+            cv2.waitKey(1)
         # cv2.waitKey(int(1000 / 30))
         if scorebox_classification != cv2_common.NO_SIDE:
             print(POINT_DICT[determine_point(frame, cap, pose_classifier, interim_point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, fencer_keypoints_left, fencer_keypoints_right, left_movement, right_movement)])
-            cv2.waitKey(1) # Pause when a valid classification is found
-        else:
-            cv2.waitKey(1) # Continue running
 
-    cv2.waitKey(0)
     cap.release()
-    cv2.destroyAllWindows()
+    if not headless:
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
