@@ -8,6 +8,16 @@ from typing import Sequence
 
 
 class ScoreboxThresholdClassifier:
+    def crop_vertical_proportion(self, src: MatLike, proportion: float) -> MatLike:
+        # Sanity check
+        if proportion <= 0.0 or proportion > 1.0:
+            raise ValueError('"proportion" must be in the range (0, 1].')
+        
+        # Crop image
+        height, width = src.shape[:2]
+        y_max = int(height * proportion)
+        return src[0:y_max, 0:width]
+
     def threshold_red(self, src: MatLike) -> MatLike:
         # Take main red threshold, including wrapping around the zero side of the hue range
         hue_range = 15
@@ -55,16 +65,18 @@ class ScoreboxThresholdClassifier:
         else:
             return contours
 
-    def classify(self, src: MatLike, show_images: bool = False) -> str:
+    def classify(self, src: MatLike, show_images: bool = False, save_images: bool = False) -> str:
         height, width = src.shape[:2]
 
-        hsv_img = convert_to_hsv(src)
+        cropped_img = self.crop_vertical_proportion(src, 0.5)
+
+        hsv_img = convert_to_hsv(cropped_img)
             
         green_threshold_img = self.threshold_green(hsv_img)
-        green_threshold_img = erode_dilate(green_threshold_img, 5)
+        green_threshold_img_denoised = erode_dilate(green_threshold_img, 5)
 
-        green_contours = self.find_contours(green_threshold_img)
-        green_contours = self.filter_contours(green_contours, RIGHT_SIDE, height, width)
+        green_contours = self.find_contours(green_threshold_img_denoised)
+        filtered_green_contours = self.filter_contours(green_contours, RIGHT_SIDE, height, width)
 
         red_threshold_img = self.threshold_red(hsv_img)
         red_threshold_img = erode_dilate(red_threshold_img, 5)
@@ -73,11 +85,27 @@ class ScoreboxThresholdClassifier:
         red_contours = self.filter_contours(red_contours, LEFT_SIDE, height, width)
 
         if show_images:
-            green_contours_img = self.draw_contours(src, green_contours, (0, 255, 0))
-            contours_img = self.draw_contours(green_contours_img, red_contours, (0, 0, 255))
-            contours_img = cv2.resize(contours_img, (960, 540))     # Resize image to fit on screen
-            cv2.imshow("contours_img", contours_img)
+            green_contours_img = self.draw_contours(cropped_img.copy(), green_contours, (0, 255, 0))
+            filtered_green_contours_img = self.draw_contours(cropped_img.copy(), filtered_green_contours, (0, 255, 0))
+            
+            cv2.imshow("src.png", src)
+            cv2.imshow("cropped_img.png", cropped_img)
+            cv2.imshow("green_threshold_img.png", green_threshold_img)
+            cv2.imshow("green_threshold_img_denoised.png", green_threshold_img_denoised)
+            cv2.imshow("green_contours_img.png", green_contours_img)
+            cv2.imshow("filtered_green_contours_img.png", filtered_green_contours_img)
             cv2.waitKey(0)
+
+        if save_images:
+            green_contours_img = self.draw_contours(cropped_img.copy(), green_contours, (0, 255, 0))
+            filtered_green_contours_img = self.draw_contours(cropped_img.copy(), filtered_green_contours, (0, 255, 0))
+            
+            cv2.imwrite("example_images/src.png", src)
+            cv2.imwrite("example_images/cropped_img.png", cropped_img)
+            cv2.imwrite("example_images/green_threshold_img.png", green_threshold_img)
+            cv2.imwrite("example_images/green_threshold_img_denoised.png", green_threshold_img_denoised)
+            cv2.imwrite("example_images/green_contours_img.png", green_contours_img)
+            cv2.imwrite("example_images/filtered_green_contours_img.png", filtered_green_contours_img)
 
         if len(red_contours) > 0 and len(green_contours) > 0:
             return BOTH_SIDES
@@ -88,9 +116,9 @@ class ScoreboxThresholdClassifier:
         else:
             return NO_SIDE
 
-    def classify_file(self, filename: str, show_images: bool = False) -> str:
+    def classify_file(self, filename: str, show_images: bool = False, save_images: bool = False) -> str:
         src = cv2.imread(filename)
-        return self.classify(src, show_images)
+        return self.classify(src, show_images, save_images)
 
 
 if __name__ == "__main__":
@@ -99,8 +127,11 @@ if __name__ == "__main__":
     if filename == "all":
         filenames = ["left-1.png", "right-1.png", "none-1.png", "both-1.png", "both-2.png"]
         for filename in filenames:
-            output = classifier.classify_file(filename, True)
+            output = classifier.classify_file(f'Scorebox-Testing-Images/{filename}', True)
             print(f"Output of {filename}: {output}")
+    elif filename == "pipeline-demo":
+        output = classifier.classify_file(f'Scorebox-Testing-Images/right-1.png', False, True)
+        print(f"Output of {filename}: {output}")
     else:
         output = classifier.classify_file(filename, True)
         print(f"Output: {output}")

@@ -12,8 +12,8 @@ names: ['fencer', 'saber']
 
 # Add keypoints configuration
 keypoints:
-  number: 15  # Maximum keypoints across all classes
-  labels: [ 'head', 'left-elbow', 'left-foot', 'left-hip', 'left-knee', 'left-shoulder', 'left-wrist', 'right-elbow', 'right-foot', 'right-hip', 'right-knee', right-shoulder', 'right-wrist', 'saber-hilt', 'saber-tip' ]
+  number: 13  # Maximum keypoints across all classes
+  labels: [ 'head', 'left-elbow', 'left-foot', 'left-hip', 'left-knee', 'left-shoulder', 'left-wrist', 'right-elbow', 'right-foot', 'right-hip', 'right-knee', right-shoulder', 'right-wrist']
 
 roboflow:
   workspace: ai-fencing-5vbck
