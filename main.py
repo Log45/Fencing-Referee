@@ -249,6 +249,8 @@ def normalize_keypoints_to_bbox(img, keypoints, bbox, imgsize=(640, 640)):
     
 
 def determine_point(frame, cap, pose_classifier: SimpleNNClassifier, point_decider, scorebox_classification, fencer_boxes_left, fencer_boxes_right, left_keypoints, right_keypoints, left_movement, right_movement):
+    if fencer_boxes_left == [] or fencer_boxes_right == [] or left_keypoints == [] or right_keypoints == []:    
+        return NO_POINT
     # Logic Table for determining the point
     if scorebox_classification == cv2_common.LEFT_SIDE:
         return POINT_LEFT
@@ -292,6 +294,7 @@ def main():
     fencer_pose_classifier = FencerPoseClassifier(FENCER_POSE_MODEL_PATH)
     # Load pose classifier model
     pose_classifier = torch.load(POSE_CLASSIFIER_MODEL_PATH, map_location=torch.device('cpu'))
+    pose_classifier.device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     pose_classifier.to(pose_classifier.device)
     # Load point decision tree model
     # point_decider = joblib.load(POINT_DECISION_TREE_PATH)

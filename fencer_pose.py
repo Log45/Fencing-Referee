@@ -1,4 +1,5 @@
 from ultralytics import YOLO
+import torch
 import cv2
 from cv2.typing import MatLike
 import numpy as np
@@ -93,9 +94,12 @@ class FencerPoseClassifier:
             img_resized = cv2.resize(img, (640, 640))
 
             # Perform inference
-            results = self.model(img_resized)
+            results = self.model(img_resized, device="mps" if torch.backends.mps.is_available() else "cuda:0" if torch.cuda.is_available() else "cpu")  
             for result in results:
                 #print(result.boxes)  # Print detection boxes
+
+                if len(result.boxes.xyxy.tolist()) < 2:
+                    continue
 
                 # Check which fencer is on the left
                 if result.boxes.xyxy.tolist()[0][0] < result.boxes.xyxy.tolist()[1][0]:
