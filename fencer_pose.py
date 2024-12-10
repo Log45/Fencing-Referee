@@ -15,6 +15,10 @@ class FencerPoseClassifier:
         if model_path:
             self.load_model(model_path)
 
+        # Initialize variables to store previous positions of the fencers
+        self.previous_left_x = None
+        self.previous_right_x = None
+
     def load_model(self, model_path):
         """
         Load a pre-trained YOLO model.
@@ -57,6 +61,9 @@ class FencerPoseClassifier:
         left_keypoints = [] # To store left fencer keypoint information
         right_boxes = [] # To store right fencer bounding box information
         right_keypoints = [] # To store right fencer keypoint information
+        # Movement calculation
+        left_movement = 0
+        right_movement = 0
         
         # Check if the input is a numpy array
         if isinstance(input_path, np.ndarray):
@@ -85,88 +92,46 @@ class FencerPoseClassifier:
 
                 # Left fencer
                 # Stretch bounding box to match the size of the original image
-                bbox_xyxy_rescaled = self.fit_xyxy_to_original_size(result.boxes.xyxy.tolist()[left], original_size)
+                left_bbox_xyxy_rescaled = self.fit_xyxy_to_original_size(result.boxes.xyxy.tolist()[left], original_size)
                 # Save detection box info
-                this_box = [bbox_xyxy_rescaled, result.boxes.conf.tolist()[left]]
-                left_boxes.append(this_box)
+                left_current_box = [left_bbox_xyxy_rescaled, result.boxes.conf.tolist()[left]]
+                left_boxes.append(left_current_box)
                 # Save keypoints info
                 left_keypoints.append(result.keypoints.xy.tolist()[left])
 
                 # Right fencer
                 # Stretch bounding box to match the size of the original image
-                bbox_xyxy_rescaled = self.fit_xyxy_to_original_size(result.boxes.xyxy.tolist()[right], original_size)
+                right_bbox_xyxy_rescaled = self.fit_xyxy_to_original_size(result.boxes.xyxy.tolist()[right], original_size)
                 # Save detection box info
-                this_box = [bbox_xyxy_rescaled, result.boxes.conf.tolist()[right]]
-                right_boxes.append(this_box)
+                right_current_box = [right_bbox_xyxy_rescaled, result.boxes.conf.tolist()[right]]
+                right_boxes.append(right_current_box)
                 # Save keypoints info
                 right_keypoints.append(result.keypoints.xy.tolist()[right])
 
+                # ---------- Calculate Movement ------------
+                # Calculate movement (delta_x) for both fencers
+                left_center_x = (left_bbox_xyxy_rescaled[0] + left_bbox_xyxy_rescaled[2]) / 2
+                right_center_x = -1 * (right_bbox_xyxy_rescaled[0] + right_bbox_xyxy_rescaled[2]) / 2
+
+                # Calculate movement for left fencer
+                if self.previous_left_x is not None:
+                    left_movement = left_center_x - self.previous_left_x
+
+                # Calculate movement for right fencer
+                if self.previous_right_x is not None:
+                    right_movement = right_center_x - self.previous_right_x
+
+                # Update previous positions for the next frame
+                self.previous_left_x = left_center_x
+                self.previous_right_x = right_center_x
+
                 #labeled_frame = result.plot()  # Annotated image
                 if save_output:
                     result.save(filename="result.jpg")  # Save the annotated image
-
-        # Check if the input is an image or a video
-        elif input_path.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
-            # Process as an image
-            img = cv2.imread(input_path)
-            if img is None:
-                raise ValueError(f"Failed to load image from path: {input_path}")
-
-            # Resize the image to 640x640 (YOLOv8 input size)
-            img_resized = cv2.resize(img, (640, 640))
-
-            # Perform inference
-            results = self.model(img_resized)
-            for result in results:
-                print(result.boxes)  # Print detection boxes
-                #labeled_frame = result.plot()  # Annotated image
-                if save_output:
-                    result.save(filename="result.jpg")  # Save the annotated image
-
-        elif input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
-            # Process as a video
-            cap = cv2.VideoCapture(input_path)
-            if not cap.isOpened():
-                raise ValueError(f"Failed to open video from path: {input_path}")
-
-            # Prepare video writer if saving output
-            if save_output:
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for saving video
-                out = cv2.VideoWriter('output_video.mp4', fourcc, 30.0, (640, 640))
-
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    print("End of video reached or error reading frame.")
-                    break
-
-                # Resize the frame to 640x640
-                frame_resized = cv2.resize(frame, (640, 640))
-
-                # Perform inference
-                results = self.model(frame_resized)
-                for result in results:
-                    print(result.boxes)  # Print detection boxes
-                    labeled_frame = result.plot()  # Annotated frame
-
-                    # Display the frame
-                    cv2.imshow("Video", labeled_frame)
-                    if save_output:
-                        out.write(labeled_frame)  # Write frame to output video
-
-                # Press 'q' to quit early
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-            cap.release()
-            if save_output:
-                out.release()
-            cv2.destroyAllWindows()
-            labeled_frame = None  # Labeled frames for video are displayed, not returned
         else:
-            raise ValueError("Unsupported file type. Provide an image (.jpg, .png) or video (.mp4, .avi).")
+            raise ValueError("Unsupported file type")
 
-        return left_boxes, left_keypoints, right_boxes, right_keypoints
+        return left_boxes, left_keypoints, right_boxes, right_keypoints, left_movement, right_movement
 
 
     def train_model(self, dataset_yaml, epochs=100, batch_size=-1, model_name="fencer_pose_model", img_size=640):
