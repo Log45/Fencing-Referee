@@ -12,7 +12,7 @@ from fencer_pose import FencerPoseClassifier
 ## Constants
 
 SCOREBOX_MODEL_PATH = 'trained_models/scorebox_detect/scorebox_detect.pt'
-FENCER_POSE_MODEL_PATH = 'trained_models/fencer_saber_keypoint/fencer_saber_keypoint.pt'
+FENCER_POSE_MODEL_PATH = 'trained_models/fencer_keypoint/fencer_keypoint.pt'
 
 ## Functions for Stream Handling
 
