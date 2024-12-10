@@ -49,8 +49,6 @@ def get_stream_file(filename: str) -> cv2.VideoCapture:
     return cap
 
 ## Drawing Bounding Boxes and Keypoints
-import cv2
-
 def annotate_boxes(annotated_frame, boxes, color, thickness, label_prefix):
     """Helper function to annotate boxes with labels."""
     for box, confidence in boxes:
@@ -78,10 +76,49 @@ def annotate_boxes(annotated_frame, boxes, color, thickness, label_prefix):
             1
         )
 
+def annotate_keypoints(frame: MatLike, 
+                       keypoints: list, 
+                       color=(0, 255, 0), 
+                       radius=5, 
+                       thickness=3, 
+                       label_prefix=None) -> MatLike:
+    """
+    Annotate keypoints on a frame.
+
+    Args:
+        frame (MatLike): The original image/frame.
+        keypoints (list): List of keypoints, where each entry is a tuple of (x, y).
+        color (tuple): Color of the keypoints in BGR format. Default is green.
+        radius (int): Radius of the keypoint circles. Default is 5.
+        thickness (int): Thickness of the circle edge. Default is 2.
+        label_prefix (str): Optional prefix for labels, e.g., "Left Fencer" or "Right Fencer".
+
+    Returns:
+        MatLike: A copy of the frame with annotated keypoints.
+    """
+    for keypoint in keypoints:
+        for xy in keypoint:
+            # Extract coordinates and confidence if available
+            x, y = xy
+            x, y = int(x), int(y)  # Convert to integers for OpenCV
+
+            # Draw the keypoint circle
+            cv2.circle(frame, (x, y), radius, color, thickness)
+
+            # Add confidence as a label if available
+            '''
+            if confidence is not None:
+                label = f"{label_prefix}: {confidence:.2f}" if label_prefix else f"{confidence:.2f}"
+                cv2.putText(annotated_frame, label, (x + radius, y - radius), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+            '''
+
 def annotate_frame_with_boxes(frame: MatLike, 
                               scorebox_boxes: list, 
                               fencer_boxes_left: list,
                               fencer_boxes_right: list, 
+                              fencer_keypoints_left: list,
+                              fencer_keypoints_right: list,
                               left_movement: float,
                               right_movement: float,
                               scorebox_color=(200, 255, 200), 
@@ -115,6 +152,12 @@ def annotate_frame_with_boxes(frame: MatLike,
     annotate_boxes(annotated_frame, fencer_boxes_left, fencer_color, thickness, "Left Fencer")
     annotate_boxes(annotated_frame, fencer_boxes_right, fencer_color, thickness, "Right Fencer")
 
+    # Annotate keypoints
+    annotate_keypoints(annotated_frame, fencer_keypoints_left, 
+                                     color=(255, 100, 100), label_prefix="Left")
+    annotate_keypoints(annotated_frame, fencer_keypoints_right, 
+                                     color=(100, 100, 255), label_prefix="Right")
+
     # Add left and right movement text at the bottom-left and bottom-right corners
     height, width = annotated_frame.shape[:2]  # Get the frame dimensions
 
@@ -133,7 +176,6 @@ def annotate_frame_with_boxes(frame: MatLike,
     return annotated_frame
 
 ## Main Processing Loop
-
 def main():
     # Parse command-line args
     parser = ArgumentParser(prog="Fencing-Referee", description="Automatically scores fencing bouts")
@@ -174,7 +216,8 @@ def main():
         #print(f"Scorebox Classification: {scorebox_classification}")
 
         # Draw bounding boxes on the original frame for the scorebox
-        annotated_frame = annotate_frame_with_boxes(frame, scorebox_boxes, fencer_boxes_left, fencer_boxes_right, left_movement, right_movement)
+        annotated_frame = annotate_frame_with_boxes(frame, scorebox_boxes, fencer_boxes_left, fencer_boxes_right, 
+                                                    fencer_keypoints_left, fencer_keypoints_right, left_movement, right_movement)
         # Resize the frame to reduce width and height by half
         frame_resized = cv2.resize(annotated_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
 

@@ -41,6 +41,21 @@ class FencerPoseClassifier:
         y_max = int(y_max * height / 640)
 
         return [x_min, y_min, x_max, y_max]
+    
+    def fit_xy_to_original_size(self, keypoints: list[float], original_size: tuple[int, int]) -> list[int]:
+        # Extract bounding box coordinates
+        result = []
+        for keypoint in keypoints:
+            x, y= map(int, keypoint[:2])
+            
+            # Adjust bounding box to the original image size
+            height, width = original_size
+            x = int(x * width / 640)
+            y = int(y * height / 640)
+            
+            result.append([x, y])
+            
+        return result
 
     def evaluate_on_input(self, input_path, save_output=False):
         """
@@ -97,7 +112,8 @@ class FencerPoseClassifier:
                 left_current_box = [left_bbox_xyxy_rescaled, result.boxes.conf.tolist()[left]]
                 left_boxes.append(left_current_box)
                 # Save keypoints info
-                left_keypoints.append(result.keypoints.xy.tolist()[left])
+                left_keypoints_rescaled = self.fit_xy_to_original_size(result.keypoints.xy.tolist()[left], original_size)
+                left_keypoints.append(left_keypoints_rescaled)
 
                 # Right fencer
                 # Stretch bounding box to match the size of the original image
@@ -106,7 +122,8 @@ class FencerPoseClassifier:
                 right_current_box = [right_bbox_xyxy_rescaled, result.boxes.conf.tolist()[right]]
                 right_boxes.append(right_current_box)
                 # Save keypoints info
-                right_keypoints.append(result.keypoints.xy.tolist()[right])
+                right_keypoints_rescaled = self.fit_xy_to_original_size(result.keypoints.xy.tolist()[right], original_size)
+                right_keypoints.append(right_keypoints_rescaled)
 
                 # ---------- Calculate Movement ------------
                 # Calculate movement (delta_x) for both fencers
