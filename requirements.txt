@@ -1,6 +1,9 @@
 scikit-learn
+joblib
 tqdm
 opencv-python
+ultralytics
 inference
 supervision
 onnx
+torch
